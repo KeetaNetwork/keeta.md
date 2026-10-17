@@ -1,6 +1,6 @@
 # keeta.md
 
-This repository is the Keeta agent skills, served at https://keeta.md as plain files for agents (see README.md, "What keeta.md serves"). Its job is to keep every skill accurate and to add skills as Keeta ships features.
+This repository is the Keeta agent skills, served at https://keeta-md.pages.dev as plain files for agents (see README.md, "What keeta.md serves"). Its job is to keep every skill accurate and to add skills as Keeta ships features.
 
 ## Layout
 
@@ -39,4 +39,4 @@ CI runs the same checks on every pull request.
 
 ## Shipping
 
-Work on a branch and open a pull request. Cloudflare Pages builds every push: pull requests get a preview URL, and merging to `main` deploys https://keeta.md. Never deploy by hand, and never change the Pages project, DNS or repository settings.
+Work on a branch and open a pull request. Cloudflare Pages builds every push: pull requests get a preview URL, and merging to `main` deploys https://keeta-md.pages.dev. Never deploy by hand, and never change the Pages project, DNS or repository settings.

@@ -1,6 +1,6 @@
 # keeta.md
 
-Agent Skills for moving money with Keeta Network, hosted at <https://keeta.md> as plain files for agents: Markdown skills, an `llms.txt` index and skill discovery indexes. There is no website. Agents can:
+Agent Skills for moving money with Keeta Network, hosted at <https://keeta-md.pages.dev> as plain files for agents: Markdown skills, an `llms.txt` index and skill discovery indexes. There is no website. Agents can:
 
 - pay anyone in USDC, KTA or other transferable tokens in about 400 ms;
 - receive bank deposits into a named US account (Bivo);
@@ -11,19 +11,19 @@ Agent Skills for moving money with Keeta Network, hosted at <https://keeta.md> a
 - issue tokens;
 - verify identity once with KYC (OneFootprint) or KYB.
 
-**Start here:** [`keeta`](plugins/keeta/skills/keeta/SKILL.md), the entry-point skill. It is hosted for agents at <https://keeta.md/SKILL.md>.
+**Start here:** [`keeta`](plugins/keeta/skills/keeta/SKILL.md), the entry-point skill. It is hosted for agents at <https://keeta-md.pages.dev/SKILL.md>.
 
 ## Get started
 
 | Where | Command |
 | --- | --- |
-| Any agent | Tell it: `Read https://keeta.md/SKILL.md and follow it to work with Keeta.` |
-| Any agent supported by the `skills` CLI (Claude Code, Cursor, Codex and others) | `npx skills add https://keeta.md` (add `--skill keeta` for just the main skill) |
+| Any agent | Tell it: `Read https://keeta-md.pages.dev/SKILL.md and follow it to work with Keeta.` |
+| Any agent supported by the `skills` CLI (Claude Code, Cursor, Codex and others) | `npx skills add https://keeta-md.pages.dev` (add `--skill keeta` for just the main skill) |
 | The same, from GitHub | `npx skills add KeetaNetwork/keeta.md` |
 | Claude Code plugin | `/plugin marketplace add KeetaNetwork/keeta.md`, then `/plugin install keeta@keeta` |
-| Read without installing | `curl https://keeta.md/SKILL.md` |
+| Read without installing | `curl https://keeta-md.pages.dev/SKILL.md` |
 
-Don't use `npx skills add https://keeta.md/SKILL.md`: the CLI rejects path-scoped URLs on a site that publishes a discovery index.
+Don't use `npx skills add https://keeta-md.pages.dev/SKILL.md`: the CLI rejects path-scoped URLs on a site that publishes a discovery index.
 
 Other sites (keeta.ai, keeta.com) link here with the same commands rather than copying the skills.
 
@@ -66,18 +66,18 @@ The build turns `plugins/keeta/skills/` and `site/` into `_site/`, the folder Cl
 | `/SKILL.md` and `/skill.md` | the `keeta` skill, with links rewritten to absolute URLs |
 | `/skills/<name>/SKILL.md` | every skill and its reference files at a short URL |
 | `/llms-full.txt` | every `SKILL.md` in one file, with links rewritten to absolute URLs |
-| `/.well-known/agent-skills/index.json` | skill discovery index v0.2.0, used by `npx skills add https://keeta.md` |
+| `/.well-known/agent-skills/index.json` | skill discovery index v0.2.0, used by `npx skills add https://keeta-md.pages.dev` |
 | `/.well-known/skills/index.json` | legacy discovery index, for older CLI versions |
 | `/.well-known/agent-skills/<name>/…` | every skill's files, plus a zip of each multi-file skill |
 
 - **Plain files.** Skills are served as `text/markdown; charset=utf-8`, the llms files as `text/plain; charset=utf-8` and the indexes as JSON, with no HTML around them.
 - **Any origin.** `site/_headers` lets any origin fetch every file, so browser-based agents can read them.
-- **The root.** `site/_redirects` serves `llms.txt` at `/`, so an agent pointed at `https://keeta.md` gets the index.
+- **The root.** `site/_redirects` serves `llms.txt` at `/`, so an agent pointed at `https://keeta-md.pages.dev` gets the index.
 - **Not found.** Any other missing path returns `404.html` with status 404 and links back to the index.
 
 ## Deploy
 
-keeta.md is a Cloudflare Pages project connected to this repository. Pages builds every push: `main` deploys to keeta.md, and other branches and pull requests get preview URLs.
+keeta.md is a Cloudflare Pages project connected to this repository. Pages builds every push: `main` deploys to <https://keeta-md.pages.dev> (keeta.md once its custom domain is ready), and other branches and pull requests get preview URLs.
 
 | Setting | Value | Where it's set |
 | --- | --- | --- |
