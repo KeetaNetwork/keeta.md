@@ -16,7 +16,7 @@ Output layout (no website, only files agents read):
     .well-known/skills/<name>/...                 every skill directory
     _headers, _redirects, 404.html                Pages configuration and the not-found page, from site/
 
-`npx skills add https://keeta.md` reads the well-known indexes. Hosted copies are
+`npx skills add https://keeta-md.pages.dev` reads the well-known indexes. Hosted copies are
 generated here and never committed: a SKILL.md outside plugins/keeta/skills/ would
 shadow the pack for `npx skills add KeetaNetwork/keeta.md`.
 """
@@ -36,7 +36,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SKILLS_ROOT = ROOT / "plugins" / "keeta" / "skills"
 SITE_SOURCE = ROOT / "site"
-SITE_URL = "https://keeta.md"
+SITE_URL = "https://keeta-md.pages.dev"
 MAIN_SKILL = "keeta"
 SKILLS_PATH = "skills"
 GITHUB_URL = "https://github.com/KeetaNetwork/keeta.md"
@@ -90,7 +90,7 @@ def deterministic_zip(skill_dir: Path, files: list[str]) -> bytes:
 
 
 def absolutize_links(markdown: str, skill: str) -> str:
-    """Point a skill's relative links at https://keeta.md/skills/, so the text works from any URL."""
+    """Point a skill's relative links at https://keeta-md.pages.dev/skills/, so the text works from any URL."""
 
     def rewrite(match: re.Match[str]) -> str:
         target = match.group(2)

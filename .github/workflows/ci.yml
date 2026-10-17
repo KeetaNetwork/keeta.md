@@ -25,7 +25,7 @@ jobs:
           test -s _site/.well-known/agent-skills/index.json && test -s _site/.well-known/skills/index.json
           test -s _site/_headers && test -s _site/_redirects
           if find _site -name '*.html' ! -name 404.html | grep -q .; then echo "keeta.md serves no HTML pages"; exit 1; fi
-          grep -q 'https://keeta.md/skills/x402-payments/SKILL.md' _site/llms.txt
+          grep -q 'https://keeta-md.pages.dev/skills/x402-payments/SKILL.md' _site/llms.txt
       - name: Check the Pages output directory matches the build
         run: grep -qx 'pages_build_output_dir = "./_site"' wrangler.toml
       - uses: actions/setup-node@v4
