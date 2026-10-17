@@ -1,0 +1,20 @@
+# Cloudflare response headers for keeta.md. This file configures the server and is not published.
+# Every file here is for agents, so any origin may fetch it, including browser-based agents.
+
+/*
+  Access-Control-Allow-Origin: *
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# Skills are UTF-8 Markdown; say so, so no client guesses another encoding.
+/SKILL.md
+  Content-Type: text/markdown; charset=utf-8
+
+/skill.md
+  Content-Type: text/markdown; charset=utf-8
+
+/skills/*
+  Content-Type: text/markdown; charset=utf-8
+
+/.well-known/agent-skills/*/SKILL.md
+  Content-Type: text/markdown; charset=utf-8
