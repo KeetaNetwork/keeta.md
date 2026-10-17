@@ -113,8 +113,6 @@ npx skills add http://localhost:8788 --list
 | `wrangler.toml` | Cloudflare Pages settings: the project name and the `_site` output directory |
 | `CLAUDE.md` | how to maintain and add skills, for agents working on this repository |
 
-The skills moved here from [KeetaNetwork/agent-skills](https://github.com/KeetaNetwork/agent-skills), which now holds Keeta Compute and the keeta.ai site.
-
 ## License
 
 Apache-2.0
