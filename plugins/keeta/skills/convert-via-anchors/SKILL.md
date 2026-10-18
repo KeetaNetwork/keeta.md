@@ -175,7 +175,8 @@ The steps below show the same flow one client at a time, for when you need a sin
 
    const chaining = new AnchorChaining({ client, resolver });
    const keetaChain = `chain:keeta:${client.network}` as const;
-   const keetaUSD = await tokenFor('USD'), keetaEUR = await tokenFor('EUR');   // Bivo's main tokens today ('$KBUSD' and '$KBEUR' as Bivo migrates); on test, take Bivo's token from its paths
+   // keetaUSD and keetaEUR are Bivo's own tokens, read from its paths as in pay-out step 2: USD and EUR on main
+   // today, $KBUSD and $KBEUR as Bivo migrates, and unlisted test tokens on test. Never look them up by ticker.
    const plans = await chaining.getPlans({
      source: { asset: keetaUSD, location: keetaChain, rail: 'KEETA_SEND', value: amount },
      destination: { asset: keetaEUR, location: keetaChain, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }

@@ -98,6 +98,7 @@ import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
 
 const chaining = new AnchorChaining({ client, resolver });
 const keetaChain = `chain:keeta:${client.network}` as const;
+// keetaUSD, keetaEUR: Bivo's tokens from its paths (pay-out step 2), never a ticker lookup: USD and EUR on main, moving to $KBUSD and $KBEUR.
 const request = {
   source: { asset: keetaUSD, location: keetaChain, value: 200n, rail: 'KEETA_SEND' as const },
   destination: { asset: keetaEUR, location: keetaChain, recipient: account.publicKeyString.get(), rail: 'KEETA_SEND' as const }
