@@ -121,6 +121,7 @@ try {
 
 - Show the user every plan: what they send, what they receive (an estimate unless the step is a signed FX quote), each step's provider and every fee. Never pick plan 0 for them.
 - Rerun right before executing: FX quotes inside a plan expire about five minutes after they are signed.
+- **Networks.** On main, KTA → USDC quotes through an FX anchor in one step (CI checks this daily). On test, KTA has no USDC route; it converts only into demo tokens, which the `can convert into` line lists, so test a swap with one of those.
 - A wallet with no balance still gets plans, so quoting is safe on a new wallet. `LEDGER_INVALID_BALANCE` at execution means it can't cover the amount plus KTA fees.
 - No plans at all means no provider serves the pair on this network right now. Report it with the `can convert into` list, and let the user pick another pair; don't pick one for them.
 

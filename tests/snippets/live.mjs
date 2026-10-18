@@ -25,7 +25,7 @@ const EXPECT = {
 	// Quoting needs no balance. The plan count is checked loosely; the log shows which providers answered.
 	'swap-quote': {
 		test: [/\d+ plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on test/, /can convert into: /],
-		main: [/\d+ plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on main/, /can convert into: /]
+		main: [/[1-9]\d* plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on main/, /steps: \[ 'fx:/, /can convert into: USDC /]
 	},
 	// Test: Keeta's own Base bridge gives this wallet a Base Sepolia address. Main: Base routes are listed.
 	'deposit-addresses': {
