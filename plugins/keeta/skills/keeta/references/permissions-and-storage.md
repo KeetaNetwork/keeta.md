@@ -1,6 +1,6 @@
 # Permissions, storage accounts, delegation and multisig
 
-Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.7. Shorthand: `const { Account, Permissions, Block } = KeetaNet.lib;`.
+Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.8. Shorthand: `const { Account, Permissions, Block } = KeetaNet.lib;`.
 
 ## The permission model
 

@@ -1,6 +1,6 @@
 # Identity: certificates, selective disclosure, encryption and signed requests
 
-Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.7 and `@keetanetwork/anchor` 0.0.100.
+Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.8 and `@keetanetwork/anchor` 0.0.104.
 
 ## Certificates on accounts
 

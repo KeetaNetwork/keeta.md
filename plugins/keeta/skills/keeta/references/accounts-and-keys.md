@@ -1,6 +1,6 @@
 # Accounts and keys
 
-Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.7. In this file, `Account` means `KeetaNet.lib.Account`.
+Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.8. In this file, `Account` means `KeetaNet.lib.Account`.
 
 ## Account kinds
 
