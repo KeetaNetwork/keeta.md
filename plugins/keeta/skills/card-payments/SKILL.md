@@ -38,7 +38,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    ```ts
    import * as KeetaAnchor from '@keetanetwork/anchor';
 
-   const am = new KeetaAnchor.AssetMovement.Client(client);
+   const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
    const providers = await am.getProvidersForTransfer({ from: keeta, rail: 'CARD_PUSH' }) ?? [];
    for (const p of providers) console.log(String(p.providerID), p.getLegalDisclaimers());
@@ -95,7 +95,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    console.log(status.transaction.status);
    ```
 
-6. Poll `getTransferStatus()` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true. Report other statuses verbatim. A pull stays `PENDING` until it is submitted, then moves to `PROCESSING`.
+6. Poll `(await transfer.getTransferStatus()).transaction.status` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true. Report other statuses verbatim. A pull stays `PENDING` until it is submitted, then moves to `PROCESSING`.
 7. To unlink a card, call `provider.deactivatePersistentForwardingTemplate({ id, account })`. This also removes the card from the provider.
 
 ## Confirmations

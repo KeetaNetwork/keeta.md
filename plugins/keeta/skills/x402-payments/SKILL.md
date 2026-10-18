@@ -19,7 +19,10 @@ Use [send-receive-tokens](../send-receive-tokens/SKILL.md) for wallet-to-wallet 
 Install the client SDK and the x402 packages (verified with `@x402/*` 2.28.0 and `@keetanetwork/keetanet-client` 0.18.8):
 
 ```bash
-npm install @keetanetwork/keetanet-client @x402/core @x402/keeta @x402/fetch @x402/express
+npm init -y && npm pkg set type=module      # Node.js 24
+# @x402/keeta pins an older @keetanetwork/anchor. Set overrides before the first install to keep one copy:
+npm pkg set 'overrides.@keetanetwork/anchor=$@keetanetwork/anchor' 'overrides.@keetanetwork/keetanet-client=$@keetanetwork/keetanet-client'
+npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x402/core@2.28.0 @x402/keeta@2.28.0 @x402/fetch@2.28.0 @x402/express@2.28.0
 ```
 
 ### Buyer: pay for a request
@@ -74,7 +77,7 @@ npm install @keetanetwork/keetanet-client @x402/core @x402/keeta @x402/fetch @x4
 
    `requestApproval` stands for your own human-approval or [spend-policy](../spend-policy/SKILL.md) check.
 
-3. Know the defaults. Without `setSpendControls`, the client accepts only the default asset (Keeta USDC, which `@x402/keeta` prices at 6 decimals), capped at `$1` per payment. A KTA-priced option is filtered out unless you opt in under `allowedAssets`. Read KTA's decimals from its token metadata (see the `keeta` skill); published values have differed. Use `KEETA_MAINNET_CAIP2` and `KTA_MAINNET_ADDRESS` on main.
+3. Know the defaults. Without `setSpendControls`, the client accepts only the default asset (Keeta USDC, which `@x402/keeta` prices at 6 decimals), capped at `$1` per payment. **On test that default doesn't work:** `@x402/keeta` 2.28.0 names `keeta_apna75…` as test USDC, a token that doesn't exist on the test network (the resolver's `$USDC` there is `keeta_aosjk5…`). On test, price in KTA or name the resolver's `$USDC` explicitly, on both the seller's `price` and the buyer's `allowedAssets`. On main the default matches the resolver. A KTA-priced option is filtered out unless you opt in under `allowedAssets`. Read KTA's decimals from its token metadata (see the `keeta` skill); published values have differed. Use `KEETA_MAINNET_CAIP2` and `KTA_MAINNET_ADDRESS` on main.
 4. Read `result.paymentStatus`. Its values are `settled`, `settle_failed`, `payment_required` or `none`.
 5. Pay **sequentially** from each account. Keeta account chains are ordered, so one account cannot sign concurrent payments. Queue requests, or spread them across several funded accounts when you need parallelism.
 
@@ -96,7 +99,8 @@ server.register(KEETA_TESTNET_CAIP2, new ExactKeetaScheme());
 app.use(paymentMiddleware({
   "GET /weather": {
     accepts: [
-      // A plain price is denominated in USDC; the Keeta token address is derived for you.
+      // A plain price is denominated in USDC; the Keeta token address is derived for you (main only: on test the
+      // package's USDC token doesn't exist, so use { asset: <resolver's $USDC>, amount } or KTA as below).
       { scheme: "exact", price: "0.01", network: KEETA_TESTNET_CAIP2, payTo },
       // Or name any Keeta token and a raw base-unit amount.
       { scheme: "exact", price: { asset: KTA_TESTNET_ADDRESS, amount: "1000" }, network: KEETA_TESTNET_CAIP2, payTo },

@@ -29,7 +29,7 @@ The Swift, Rust and C# SDKs don't support `entityType` yet.
    ```ts
    import * as KeetaAnchor from '@keetanetwork/anchor';
 
-   const kyc = new KeetaAnchor.KYC.Client(client);
+   const kyc = new KeetaAnchor.KYC.Client(client, { resolver });
    const countries = await kyc.getSupportedCountries('business');
    if (countries.length === 0) throw new Error('no KYB provider on this network');
 

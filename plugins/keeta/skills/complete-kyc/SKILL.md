@@ -27,7 +27,7 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
    ```ts
    import * as KeetaAnchor from '@keetanetwork/anchor';
 
-   const kyc = new KeetaAnchor.KYC.Client(client);
+   const kyc = new KeetaAnchor.KYC.Client(client, { resolver });
    const countries = await kyc.getSupportedCountries('individual');      // empty: no KYC provider on this network
    const providers = await kyc.createVerification({
      countryCodes: ['US'],
@@ -45,7 +45,7 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
 3. Poll with backoff until there is a result:
 
    ```ts
-   const status = await verification.getVerificationStatus();     // pass | fail | incomplete | pending | error
+   const { status } = await verification.getVerificationStatus();  // pass | fail | incomplete | pending | error
    const certs = await verification.getCertificates();
    if (!certs.ok) await KeetaAnchor.KeetaNet.lib.Utils.Helper.asleep(certs.retryAfter);
    ```

@@ -33,6 +33,7 @@ declare global {
 
 	// The connected client and its account.
 	const client: UserClient;
+	const resolver: InstanceType<typeof KeetaAnchorModule.lib.Resolver>;
 	const account: Account;
 	const me: Account;
 	const keeta: `chain:keeta:${bigint}`;
@@ -104,6 +105,7 @@ declare global {
 	const card: { type: 'persistent-address-template'; persistentAddressTemplateId: string };
 
 	// Approval prompts the agent shows a human.
+	function tokenFor(ticker: Parameters<InstanceType<typeof KeetaAnchorModule.lib.Resolver>['lookupToken']>[0]): Promise<TokenAddress>;
 	function askApproval(question: string): Promise<boolean>;
 	function requestApproval(...details: unknown[]): Promise<boolean>;
 }

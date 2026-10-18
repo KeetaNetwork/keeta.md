@@ -29,20 +29,20 @@ Which providers appear varies by account and network. Who may use each one (indi
    import * as KeetaAnchor from '@keetanetwork/anchor';
 
    const client = KeetaAnchor.KeetaNet.UserClient.fromNetwork('test', account);   // or 'main', as confirmed
-   const fx = new KeetaAnchor.FX.Client(client);
-   const assetMovement = new KeetaAnchor.AssetMovement.Client(client);
-   const kyc = new KeetaAnchor.KYC.Client(client);
+   const fx = new KeetaAnchor.FX.Client(client, { resolver });
+   const assetMovement = new KeetaAnchor.AssetMovement.Client(client, { resolver });
+   const kyc = new KeetaAnchor.KYC.Client(client, { resolver });
    ```
 
 2. Prefer the typed service methods. They apply the right criteria for you:
    - `assetMovement.getProvidersForTransfer({ asset, from, to })`, then `provider.isOperationSupported('initiateTransfer' | 'createPersistentForwarding')`
    - `fx.listPossibleConversions({ from })`, `fx.getQuotes(...)` and `fx.getEstimates(...)`
    - `kyc.getSupportedCountries('individual' | 'business')` and `kyc.createVerification(...)`
-   - `new KeetaAnchor.Username.Client(client).resolve(...)`, the storage client (deep import), and `new KeetaAnchor.Notification.Client(client).getProviders(...)`
+   - `new KeetaAnchor.Username.Client(client, { resolver }).resolve(...)`, the storage client (deep import), and `new KeetaAnchor.Notification.Client(client, { resolver }).getProviders(...)`
 3. For generic discovery, or to inspect what a network offers, use the resolver directly:
 
    ```ts
-   const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [] });
+   const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
    const tokens = await resolver.listTokens();                       // official token ↔ currency map
    const fxProviders = await resolver.lookup('fx', { inputCurrencyCode: 'USD', outputCurrencyCode: '$KTA' });
    const onRamps = await resolver.lookup('assetMovement', { asset: 'USD', from: 'bank-account:us', to: `chain:keeta:${client.network}` });

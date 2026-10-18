@@ -105,12 +105,21 @@ If the agent runs on its own account and can't read the principal's certificate,
 
 ## Quickstart (test network)
 
+The anchor SDK needs **Node.js 24** and ES modules. Set up a project once:
+
 ```bash
-npm install @keetanetwork/keetanet-client @keetanetwork/anchor
+node --version                                  # must print v24.x
+npm init -y && npm pkg set type=module          # top-level await needs ES modules
+npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 tsx
+KEETA_SEED=… npx tsx quickstart.ts              # load the seed from your secret store
 ```
 
 ```ts
+// live-test: quickstart
 import * as KeetaNet from '@keetanetwork/keetanet-client';
+import * as KeetaAnchor from '@keetanetwork/anchor';
+import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
+import { decodeTokenMetadata } from '@keetanetwork/anchor/lib/token-metadata.js';
 import type { TokenAddress } from '@keetanetwork/keetanet-client/lib/account.js';
 
 const { Account } = KeetaNet.lib;
@@ -120,15 +129,22 @@ const seed = process.env.KEETA_SEED ?? Account.generateRandomSeed({ asString: tr
 const account = Account.fromSeed(seed, 0);
 const client = KeetaNet.UserClient.fromNetwork('test', account);
 
-// Decimals are token metadata: base64 JSON with `decimalPlaces` (sometimes zlib-deflated first).
+// One resolver for every anchor client. It signs metadata requests with the account, as Keeta Personal
+// does: some providers publish their routes only to signed requests, and an unsigned resolver misses them.
+const resolver = new KeetaAnchor.lib.Resolver({ ...getDefaultResolverConfig(client), metadataConfig: { signing: { account } } });
+
+// Decimals are token metadata (base64 JSON with `decimalPlaces`, a number or a numeric string).
 async function decimalsOf(token: TokenAddress): Promise<number> {
   const { info } = await client.client.getAccountInfo(token);
-  const raw = KeetaNet.lib.Utils.Helper.bufferToArrayBuffer(Buffer.from(info.metadata, 'base64'));
-  let json: ArrayBuffer;
-  try { json = KeetaNet.lib.Utils.Buffer.ZlibInflate(raw); } catch { json = raw; }
-  const { decimalPlaces } = JSON.parse(Buffer.from(json).toString('utf-8'));
-  if (!Number.isInteger(decimalPlaces)) throw new Error('token has no decimalPlaces metadata');
-  return decimalPlaces;
+  if (!info.metadata) throw new Error(`${token.publicKeyString.get()} has no metadata, so its decimals are unknown`);
+  return decodeTokenMetadata(info.metadata).decimalPlaces;   // throws on anything that isn't a whole number
+}
+
+// Token addresses come from the resolver, not from memory.
+async function tokenFor(ticker: Parameters<typeof resolver.lookupToken>[0]): Promise<TokenAddress> {
+  const hit = await resolver.lookupToken(ticker);              // '$USDC', '$KTA', 'USD', 'EUR'…
+  if (!hit) throw new Error(`no ${ticker} token on this network`);
+  return Account.fromPublicKeyString(hit.token).assertKeyType(Account.AccountKeyAlgorithm.TOKEN);
 }
 
 try {
@@ -138,6 +154,8 @@ try {
   const kta = client.baseToken;
   const decimals = await decimalsOf(kta);
   console.log('KTA balance (base units):', await client.balance(kta), 'decimals:', decimals);
+  const usdc = await tokenFor('$USDC');
+  console.log('USDC token:', usdc.publicKeyString.get(), 'decimals:', await decimalsOf(usdc));
 
   // Send 0.01 KTA only after the user confirms the recipient, token, and amount.
   if (process.env.KEETA_RECIPIENT && process.env.KEETA_CONFIRMED === 'yes') {
@@ -149,6 +167,8 @@ try {
   await client.destroy();
 }
 ```
+
+Every later example assumes this `client`, `account` and `resolver`, and passes the resolver to each anchor client: `new KeetaAnchor.AssetMovement.Client(client, { resolver })`, the same for `FX`, `KYC`, `Username` and `Notification`, and `new AnchorChaining({ client, resolver })`.
 
 To fund the account, ask the test faucet for a small amount of KTA. Send the header exactly as written: it rejects a `;charset` suffix.
 
@@ -228,7 +248,7 @@ curl -sS -X POST https://faucet.test.keeta.com/ \
 | Explorer | <https://explorer.test.keeta.com> | <https://explorer.keeta.com> |
 | Faucet | <https://faucet.test.keeta.com> | none |
 
-- **Token addresses.** Prefer `client.baseToken` and resolver lookups (`resolver.listTokens()`, `resolver.lookupToken('USD')`) over the hardcoded values above.
+- **Token addresses.** Prefer `client.baseToken` and resolver lookups (`resolver.listTokens()`, `resolver.lookupToken('$USDC')`) over the hardcoded values above. The two networks list different tickers: main has fiat codes such as `USD` and `EUR` plus `$USDC`, `$EURC`, `$cbBTC` and others, while test lists `$USDC`, `$EURC`, `$CBBTC`, `$KUSD`, `$KEUR` and a few more. List them with `resolver.listTokens()` instead of assuming one exists.
 - **Metadata mirror.** <https://static.network.keeta.com/metadata/currencyMap> and `/metadata/services` publish token and service metadata. It is a convenience copy, so verify it against the on-chain resolver.
 - **Explorer paths.** Append `/account/<address>`, `/token/<address>`, `/block/<hash>`, `/staple/<hash>` or `/storage/<address>` to the explorer URL. Give the user an explorer link after each publish.
 - **Other chains.** Anchors name them `chain:evm:<chainId>` and `chain:solana:<genesis hash>`. The EVM IDs are Base 84532 (test) and 8453 (main), Ethereum 11155111 and 1, Arbitrum 421614 and 42161, Avalanche C-Chain 43113 and 43114, Polygon 80002 and 137, and BNB Smart Chain 56 (main). See [bridge-crypto](../bridge-crypto/SKILL.md).
