@@ -45,6 +45,9 @@ for (const network of ['test', 'main'] as const) {
 
 		if (kta !== stated.kta) problems.push(`${network}: KTA is ${kta}, skills say ${stated.kta}`);
 		if (usdc !== stated.usdc) problems.push(`${network}: resolver $USDC is ${usdc}, skills say ${stated.usdc}`);
+		// x402-payments says @x402/keeta's test USDC doesn't exist and its main USDC matches the resolver.
+		if (network === 'test' && x402UsdcExists) problems.push('test: @x402/keeta USDC now exists; update the x402-payments warning');
+		if (network === 'main' && x402Usdc !== usdc) problems.push(`main: @x402/keeta USDC ${x402Usdc} differs from the resolver's ${usdc}`);
 		if (!baseProviders.includes(stated.bridgeProvider)) problems.push(`${network}: Base providers are ${baseProviders.join(', ')}, skills name ${stated.bridgeProvider}`);
 	} finally {
 		await client.destroy();

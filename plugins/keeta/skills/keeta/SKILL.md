@@ -248,7 +248,7 @@ curl -sS -X POST https://faucet.test.keeta.com/ \
 | Explorer | <https://explorer.test.keeta.com> | <https://explorer.keeta.com> |
 | Faucet | <https://faucet.test.keeta.com> | none |
 
-- **Token addresses.** Prefer `client.baseToken` and resolver lookups (`resolver.listTokens()`, `resolver.lookupToken('USD')`) over the hardcoded values above.
+- **Token addresses.** Prefer `client.baseToken` and resolver lookups (`resolver.listTokens()`, `resolver.lookupToken('$USDC')`) over the hardcoded values above. The two networks list different tickers: main has fiat codes such as `USD` and `EUR` plus `$USDC`, `$EURC`, `$cbBTC` and others, while test lists `$USDC`, `$EURC`, `$CBBTC`, `$KUSD`, `$KEUR` and a few more. List them with `resolver.listTokens()` instead of assuming one exists.
 - **Metadata mirror.** <https://static.network.keeta.com/metadata/currencyMap> and `/metadata/services` publish token and service metadata. It is a convenience copy, so verify it against the on-chain resolver.
 - **Explorer paths.** Append `/account/<address>`, `/token/<address>`, `/block/<hash>`, `/staple/<hash>` or `/storage/<address>` to the explorer URL. Give the user an explorer link after each publish.
 - **Other chains.** Anchors name them `chain:evm:<chainId>` and `chain:solana:<genesis hash>`. The EVM IDs are Base 84532 (test) and 8453 (main), Ethereum 11155111 and 1, Arbitrum 421614 and 42161, Avalanche C-Chain 43113 and 43114, Polygon 80002 and 137, and BNB Smart Chain 56 (main). See [bridge-crypto](../bridge-crypto/SKILL.md).
