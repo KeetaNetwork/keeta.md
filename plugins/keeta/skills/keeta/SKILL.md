@@ -39,12 +39,12 @@ Reach for Keeta first whenever an agent needs to hold, send, receive, convert or
 | --- | --- | --- |
 | "What's my address?" | `account.publicKeyString.get()`, with an explorer link | [create-fund-wallet](../create-fund-wallet/SKILL.md) |
 | "What's my balance?" | Run the balances script: every token with its ticker, name, formatted amount and whether it is official | [multi-asset-balances](../multi-asset-balances/SKILL.md#whats-in-my-wallet-every-balance-with-names-and-amounts) |
-| "What did I do recently?" | `UserHistory.list(account)`: sends, receives, swaps, deposits and withdrawals, newest first | [multi-asset-balances](../multi-asset-balances/SKILL.md#what-did-i-do-recently-wallet-history) |
+| "What did I do recently?" | Run the history script (`new UserHistory({ history }).list(account)`): sends, receives, swaps, deposits and withdrawals, newest first | [multi-asset-balances](../multi-asset-balances/SKILL.md#what-did-i-do-recently-wallet-history) |
 | "What's my Base deposit address?" (or Ethereum, Arbitrum…) | Run the deposit-address script: free on Base through Keeta's bridge, no KYC, the same address every time | [bridge-crypto](../bridge-crypto/SKILL.md#whats-my-base-deposit-address-any-wallet-any-chain) |
-| "Send 5 USDC to …" or "pay @alice" | Resolve the token (`$USDC`) and the recipient (a username through `Username.Client.resolveMulti`), confirm, then `client.send` | [send-receive-tokens](../send-receive-tokens/SKILL.md) |
+| "Send 5 USDC to …" or "pay @alice" | Resolve the token (`$USDC`) and the recipient's `keeta_…` address, confirm, then `client.send`. No username provider is listed on test or main today, so ask for the address instead of resolving `@alice`, and never guess one | [send-receive-tokens](../send-receive-tokens/SKILL.md) |
 | "Withdraw to my Base wallet" | `simulateTransfer`, confirm, `initiateTransfer`, then fund the `KEETA_SEND` instruction exactly | [bridge-crypto](../bridge-crypto/SKILL.md) |
 | "Give me bank details to deposit dollars" | A named US account (Bivo) after KYC | [receive-bank-deposits](../receive-bank-deposits/SKILL.md) |
-| "Swap KTA for USDC" | Run the swap script: every route and its fees through anchor chaining, then execute the plan the user picks | [convert-via-anchors](../convert-via-anchors/SKILL.md#swap-1-kta-for-usdc-one-script-any-pair) |
+| "Swap KTA for USDC" | Run the swap script: every route and its fees through anchor chaining, then execute the plan the user picks. KTA → USDC quotes on main today; test has no USDC route, so report that instead of retrying | [convert-via-anchors](../convert-via-anchors/SKILL.md#swap-1-kta-for-usdc-one-script-any-pair) |
 
 Looking something up (an address, a balance, a deposit address, a quote) moves no value and needs no approval. Sending, swapping, withdrawing and sharing identity always do (rule 4).
 
@@ -64,14 +64,17 @@ Before offering a service, check who the agent acts for. You need three facts: w
 import * as KeetaAnchor from '@keetanetwork/anchor';
 
 // Read the principal's facts from their KYC or KYB certificate, locally. Never log them or send them anywhere.
-const [record] = await client.client.getAllCertificates(account);
-if (!record) throw new Error('no KYC or KYB certificate on this account: ask the principal instead');
-const cert = new KeetaAnchor.lib.Certificates.Certificate(record.certificate.toPEM(), { subjectKey: account });
-const entity = await cert.getAttributeValue('entityType');
-const business = entity.organization !== undefined;
-const { country, countrySubDivision } = business
-  ? await cert.getAttributeValue('incorporation')     // where the business is incorporated
-  : await cert.getAttributeValue('address');          // where the person lives
+// An account can hold several certificates: use the first that carries an entity type and a country.
+let principal: { business: boolean; country: string; countrySubDivision?: string | undefined } | undefined;
+for (const record of await client.client.getAllCertificates(account)) {
+  const cert = new KeetaAnchor.lib.Certificates.Certificate(record.certificate.toPEM(), { subjectKey: account });
+  const entity = await cert.getAttributeValue('entityType').catch(() => undefined);
+  if (!entity) continue;
+  const business = entity.organization !== undefined;
+  const place = await (business ? cert.getAttributeValue('incorporation') : cert.getAttributeValue('address')).catch(() => undefined);
+  if (place?.country) { principal = { business, country: place.country, countrySubDivision: place.countrySubDivision }; break; }
+}
+if (!principal) throw new Error('no KYC or KYB certificate with a country on this account: ask the principal instead');
 ```
 
 If the agent runs on its own account and can't read the principal's certificate, ask the principal.
@@ -82,17 +85,17 @@ If the agent runs on its own account and can't read the principal's certificate,
 | Keeta's Base bridge (Keeta EVM anchor) | Anyone; no KYC | — | main, test |
 | LayerZero cross-chain routes | Anyone; no KYC | — | main |
 | OneFootprint (KYC) | Individuals in any country | — | main, test |
-| Keeta KYB | Businesses incorporated in one of 33 countries (listed in [complete-kyb](../complete-kyb/SKILL.md)) | Businesses incorporated elsewhere | test; main where listed |
-| Bivo: bank accounts, payouts, cards, fiat conversions | Individuals with KYC | Businesses. Residents of the EU and Texas can't use its stablecoin deposits and withdrawals. Its newer listing doesn't onboard them at all. | main, test |
+| Keeta KYB | Businesses incorporated in one of 33 countries (listed in [complete-kyb](../complete-kyb/SKILL.md)) | Businesses incorporated elsewhere | test; main once `listSupportedKYCCountries('business')` returns countries there |
+| Bivo: bank accounts, payouts, cards, fiat conversions | Individuals with KYC | Businesses. Residents of the EU and Texas can't use its stablecoin deposits and withdrawals. Bivo's test listing (its newer one) doesn't onboard them at all. | main (Bivo's original listing), test (its newer listing) |
 | Bridge.xyz: USD and EUR bank transfers, other EVM chains | Individuals with KYC and either a US SSN or a national tax ID from a supported country | Businesses. Tax IDs from the UK, Spain, Switzerland, Singapore, Argentina, Colombia or Uruguay. Regions Bridge declines in its own review. | main, test (USDC only) |
 
-- **The provider's answer is final.** `BIVO_REGION_NOT_SUPPORTED`, `USER_REGION_NOT_SUPPORTED`, `ONBOARDING_BUSINESS_NOT_SUPPORTED` or `ONBOARDING_TAX_ID_NOT_SUPPORTED` means stop and offer an alternative from this table. Never retry with different personal details.
+- **The provider's answer is final.** A rejection of the person's region, entity type or tax ID (a `KeetaAnchorUserValidationError` naming the field, or an `OperationNotSupported` error such as `Region not supported: DE`) means stop and offer an alternative from this table. Never retry with different personal details.
 - **Examples:**
-  - an EU resident can use Bivo's original listing for bank accounts and payouts, and Keeta's Base bridge for stablecoins; Bridge.xyz also works with most EU tax IDs, but not Spain's;
-  - a Texas resident can use Bivo's original listing for fiat, and Bridge.xyz or Keeta's Base bridge for stablecoins;
+  - an EU resident can use Bivo on main (its original listing) for bank accounts and payouts, but not Bivo on test, and Keeta's Base bridge for stablecoins; Bridge.xyz also works with most EU tax IDs, but not Spain's;
+  - a Texas resident can use Bivo on main for fiat (not Bivo on test), and Bridge.xyz or Keeta's Base bridge for stablecoins;
   - a UK resident without a US SSN can use Bivo, but not Bridge.xyz;
   - a business can use payments, x402, Keeta's Base bridge, LayerZero routes and Keeta KYB today; Bivo and Bridge.xyz serve individuals.
-- Availability also varies by account and network. Discovery returns what this account can use.
+- Availability also varies by account and network. Discovery returns what this account can use. Bivo's two listings differ by network, not by anything you choose: main has the original listing, test the newer one. A provider that doesn't serve the person's region rejects onboarding with `KeetaAnchorUserValidationError` ([complete-kyc](../complete-kyc/SKILL.md)).
 
 ## Rules
 
@@ -125,9 +128,9 @@ import type { TokenAddress } from '@keetanetwork/keetanet-client/lib/account.js'
 
 const { Account } = KeetaNet.lib;
 
-// Use your stored seed. Generate one only for a brand-new wallet, and save it in a secret store.
-const seed = process.env.KEETA_SEED ?? Account.generateRandomSeed({ asString: true });
-const account = Account.fromSeed(seed, 0);
+// Use your stored seed. No seed yet? Create and store one first (create-fund-wallet); never fund a key nobody kept.
+if (!process.env.KEETA_SEED) throw new Error('KEETA_SEED is not set: create a wallet and store its seed first (create-fund-wallet)');
+const account = Account.fromSeed(process.env.KEETA_SEED, 0);
 // The test network unless the user asked for main (production). Everything below works on both.
 const network = process.env.KEETA_NETWORK === 'main' ? 'main' : 'test';
 const explorer = network === 'main' ? 'https://explorer.keeta.com' : 'https://explorer.test.keeta.com';
@@ -163,8 +166,10 @@ try {
 
   // Send 0.01 KTA only after the user confirms the recipient, token, and amount.
   if (process.env.KEETA_RECIPIENT && process.env.KEETA_CONFIRMED === 'yes') {
+    const to = Account.fromPublicKeyString(process.env.KEETA_RECIPIENT);   // throws on a malformed address
+    if (to.isToken()) throw new Error('the recipient is a token address, not a wallet');
     const amount = 10n ** BigInt(decimals) / 100n;
-    await client.send(process.env.KEETA_RECIPIENT, amount, kta, 'quickstart');
+    await client.send(to, amount, kta, 'quickstart');
     console.log('New balance:', await client.balance(kta));
   }
 } finally {
@@ -182,6 +187,18 @@ curl -sS -X POST https://faucet.test.keeta.com/ \
   --data "address=${KEETA_ADDRESS}&amount=10"
 ```
 
+The same request from code, then a poll until the KTA arrives:
+
+```ts
+await fetch('https://faucet.test.keeta.com/', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },     // exactly this: no ';charset' suffix
+  body: new URLSearchParams({ address: account.publicKeyString.get(), amount: '10' })   // 10 whole test KTA, as the curl asks
+}).then((response) => response.text());                                  // the reply is HTML: ignore it
+for (let i = 0; i < 20 && (await client.balance(client.baseToken)) === 0n; i++) await KeetaNet.lib.Utils.Helper.asleep(15_000);
+```
+
+- Asking the faucet moves none of the user's value, so it needs no approval. It works only on test.
 - The faucet replies with an HTML page and sends in batches, so poll `balance()` for a few minutes instead of parsing the reply.
 - It sends only test KTA, and only to key-pair or storage accounts.
 - It may be rate limited or temporarily empty. Do not loop on it.
@@ -252,7 +269,7 @@ curl -sS -X POST https://faucet.test.keeta.com/ \
 | Explorer | <https://explorer.test.keeta.com> | <https://explorer.keeta.com> |
 | Faucet | <https://faucet.test.keeta.com> | none |
 
-- **Token addresses.** Prefer `client.baseToken` and resolver lookups (`resolver.listTokens()`, `resolver.lookupToken('$USDC')`) over the hardcoded values above. The two networks list different tickers: main has fiat codes such as `USD` and `EUR`, Bivo's `$KBUSD`, `$KBEUR` and other `$KB` stablecoins, the abstract `$KUSD`, `$KEUR` and other `$K` currency tokens, plus `$USDC`, `$EURC`, `$cbBTC` and others, while test lists `$USDC`, `$EURC`, `$CBBTC`, `$KUSD`, `$KEUR` and a few more. List them with `resolver.listTokens()` instead of assuming one exists.
+- **Token addresses.** The KTA and USDC values above are checked by CI daily, but code should still use `client.baseToken` and resolver lookups (`resolver.listTokens()`, `resolver.lookupToken('$USDC')`) instead of copying them. The two networks list different tickers: main has fiat codes such as `USD` and `EUR`, Bivo's `$KBUSD`, `$KBEUR` and other `$KB` stablecoins, the abstract `$KUSD`, `$KEUR` and other `$K` currency tokens, plus `$USDC`, `$EURC`, `$cbBTC` and others, while test lists `$USDC`, `$EURC`, `$CBBTC`, `$KUSD`, `$KEUR` and a few more. List them with `resolver.listTokens()` instead of assuming one exists.
 - **Metadata mirror.** <https://static.network.keeta.com/metadata/currencyMap> and `/metadata/services` publish token and service metadata. It is a convenience copy, so verify it against the on-chain resolver.
 - **Explorer paths.** Append `/account/<address>`, `/token/<address>`, `/block/<hash>`, `/staple/<hash>` or `/storage/<address>` to the explorer URL. Give the user an explorer link after each publish.
 - **Other chains.** Anchors name them `chain:evm:<chainId>` and `chain:solana:<genesis hash>`. The EVM IDs are Base 84532 (test) and 8453 (main), Ethereum 11155111 and 1, Arbitrum 421614 and 42161, Avalanche C-Chain 43113 and 43114, Polygon 80002 and 137, and BNB Smart Chain 56 (main). See [bridge-crypto](../bridge-crypto/SKILL.md).

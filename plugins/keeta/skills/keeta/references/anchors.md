@@ -22,7 +22,7 @@ Anchors are off-chain services that connect Keeta to the outside world. They pub
 | **Keeta EVM anchor** | asset movement | Keeta's own bridge with Base for KTA, USDC, EURC and cbBTC, with no bridge fee | main (Base), test (Base Sepolia) | None |
 | **LayerZero** (Virtual Transfer anchor) | asset movement | Bridges and swaps about 50 tokens across 10 EVM chains, with Solana as a destination. It never touches Keeta, so routes chain it with the Keeta EVM anchor through Base. | main | None |
 | **OneFootprint** | KYC | Hosted identity verification that issues a reusable Keeta KYC certificate | main, test | — |
-| **Keeta KYB provider** | KYC (`entityType: 'business'`) | Business verification for companies incorporated in 33 countries | where listed | — |
+| **Keeta KYB provider** | KYC (`entityType: 'business'`) | Business verification for companies incorporated in 33 countries | test; main once `resolver.listSupportedKYCCountries('business')` returns countries there | — |
 | **Stablecoin FX anchor** | FX | 1:1 conversions between an issuer's stablecoin and Keeta's abstract currency token (`$KBUSD` ↔ `$KUSD`, `$KBEUR` ↔ `$KEUR`…); one issuer to another chains two legs | main | None |
 
 Who may use each provider (individuals or businesses, and regional limits) is in "Match services to your principal" in [SKILL.md](../SKILL.md).
@@ -32,7 +32,10 @@ Workflows: [receive-bank-deposits](../../receive-bank-deposits/SKILL.md), [pay-o
 ## Discover
 
 ```ts
-const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
+import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
+
+// The same signed resolver as the keeta quickstart: the network's root account, signing metadata requests with the wallet.
+const resolver = new KeetaAnchor.lib.Resolver({ ...getDefaultResolverConfig(client), metadataConfig: { signing: { account } } });
 const tokens = await resolver.listTokens();                 // [{ token: 'keeta_…', currency: 'USD' | '$KTA' | … }]
 const usd = await resolver.lookupToken('USD');              // { token, currency } | null; main only. '$KUSD' is the abstract dollar token, '$KBUSD' Bivo's (main)
 const kycCountries = await resolver.listSupportedKYCCountries('individual');
@@ -85,7 +88,7 @@ const plain = fx ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizabl
 
 The [convert-via-anchors](../../convert-via-anchors/SKILL.md) skill has the full workflow:
 
-- **Quotes and estimates.** `getQuotes({ from, to, amount, affinity })` returns firm, signed quotes. They have no expiry field, but providers reject one about five minutes after signing, so fetch a new quote rather than reusing an old one. `getEstimates` is cheaper and indicative; `estimate.getQuote(maxDeviation)` turns an estimate into a quote.
+- **Quotes and estimates.** `getQuotes({ from, to, amount, affinity })` returns firm, signed quotes. They have no expiry field, but providers reject one about five minutes after signing, so fetch a new quote rather than reusing an old one. `getEstimates` is cheaper and indicative; `estimate.getQuote(tolerance)` turns an estimate into a quote, rejecting it if it moves more than `tolerance`, a fraction (default `0.10`, 10%; pass `0.05` for 5%).
 - **Prices.** `getPrices({ assets, priceIn })` returns indicative prices.
 - **Exchange.** `quote.createExchange()` signs a swap block (send `from`, receive `to`, and send the fee), and the provider publishes it. Poll `getExchangeStatus()` until the status is `completed` or `failed`.
 
@@ -100,7 +103,7 @@ const chaining = new AnchorChaining({ client, resolver });
 const keetaChain = `chain:keeta:${client.network}` as const;
 // keetaUSD, keetaEUR: Bivo's tokens from its paths (pay-out step 2), never a ticker lookup: USD and EUR on main, moving to $KBUSD and $KBEUR.
 const request = {
-  source: { asset: keetaUSD, location: keetaChain, value: 200n, rail: 'KEETA_SEND' as const },
+  source: { asset: keetaUSD, location: keetaChain, value: 200n, rail: 'KEETA_SEND' as const },   // base units of keetaUSD: read its decimals first
   destination: { asset: keetaEUR, location: keetaChain, recipient: account.publicKeyString.get(), rail: 'KEETA_SEND' as const }
 };
 const plans = await chaining.getPlans(request);
@@ -116,7 +119,7 @@ if (plan) {
 }
 ```
 
-- `event.markCompleted({ sent: false })` approves the send, and the plan then publishes it. Never publish it yourself as well, or it is paid twice.
+- `event.markCompleted({ sent: false })` approves the send, and the plan then publishes it, whatever `sent` says. Never publish it yourself as well, or it is paid twice.
 - **A plan is not atomic.** Each step settles on its own. If a step fails, `execute()` throws that step's error, and `plan.state` holds `status: 'failed'`, `completedSteps` and `failedAtStepIndex` (the same values reach `plan.on('failed', …)`). **Never call `execute()` again.** Reconcile balances, then plan only the remaining leg.
 
 ## KYC and KYB
@@ -157,7 +160,7 @@ if (provider) {
 ```
 
 - Objects are encrypted on the client, but **paths, tags, sizes and visibility are plaintext**.
-- `visibility: 'public'` lets the anchor decrypt the object and serve it from a signed URL (`session.getPublicUrl(path, { ttl })`).
+- `visibility: 'public'` lets the anchor decrypt the object and serve it from a signed URL (`provider.getPublicUrl({ path, ttl })`, or `session.getPublicUrl(relativePath, { ttl })` on a storage session).
 - Quotas come from provider metadata. Handle quota-exceeded errors.
 
 ## Notifications
