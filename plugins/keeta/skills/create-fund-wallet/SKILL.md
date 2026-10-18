@@ -14,7 +14,7 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
 
 ## SDK steps
 
-1. Install the client: `npm install @keetanetwork/keetanet-client`.
+1. Install the client on Node.js 24 in an ES-module project: `npm init -y && npm pkg set type=module && npm install @keetanetwork/keetanet-client@0.18.8 tsx` (add `@keetanetwork/anchor@0.0.104` for anchors).
 2. Create or restore the account, then connect:
 
    ```ts
@@ -29,7 +29,7 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
    const address = account.publicKeyString.get();              // share only this
    ```
 
-   To restore from a recovery phrase, which is also how Keeta Personal derives accounts, run `const seed = await Account.seedFromPassphrase(process.env.KEETA_PHRASE!, { asString: true })` and then `Account.fromSeed(seed, 0)`. The SDK rejects short passphrases.
+   To restore from a recovery phrase, which is also how Keeta Personal derives accounts, run `const seed = await Account.seedFromPassphrase(process.env.KEETA_PHRASE!, { asString: true })` and then `Account.fromSeed(seed, 0)`. The SDK rejects short passphrases. A Keeta Personal wallet secured by a passkey has no recovery phrase to export: create a dedicated agent account instead and fund it with a transfer from that wallet.
 3. Fund the account:
    - **test:** ask the faucet for test KTA. Send the header exactly as written: a `;charset` suffix is rejected.
 

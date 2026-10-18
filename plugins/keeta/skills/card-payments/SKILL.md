@@ -95,7 +95,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    console.log(status.transaction.status);
    ```
 
-6. Poll `getTransferStatus()` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true. Report other statuses verbatim. A pull stays `PENDING` until it is submitted, then moves to `PROCESSING`.
+6. Poll `(await transfer.getTransferStatus()).transaction.status` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true. Report other statuses verbatim. A pull stays `PENDING` until it is submitted, then moves to `PROCESSING`.
 7. To unlink a card, call `provider.deactivatePersistentForwardingTemplate({ id, account })`. This also removes the card from the provider.
 
 ## Confirmations

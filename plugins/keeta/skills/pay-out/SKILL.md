@@ -40,7 +40,8 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
 
    const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
-   const asset = { from: usdToken, to: 'MXN' as const };   // the Keeta token you pay from → the recipient's currency
+   const usdToken = await tokenFor('USD');                  // the Keeta token you pay from (keeta quickstart helper)
+   const asset = { from: usdToken, to: 'MXN' as const };   // → the recipient's currency
    const to = 'bank-account:clabe' as const;                // the recipient's bank location (table below)
    const providers = await am.getProvidersForTransfer({ asset, from: keeta, to, rail: 'SPEI_PUSH' }) ?? [];
    for (const p of providers) console.log(String(p.providerID), p.getLegalDisclaimers());

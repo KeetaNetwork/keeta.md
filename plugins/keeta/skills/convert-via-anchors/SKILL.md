@@ -71,6 +71,7 @@ Use for an on-chain conversion once the exact source and destination assets are 
 
    const chaining = new AnchorChaining({ client, resolver });
    const keetaChain = `chain:keeta:${client.network}` as const;
+   const keetaUSD = await tokenFor('USD'), keetaEUR = await tokenFor('EUR');   // helper from the keeta quickstart
    const plans = await chaining.getPlans({
      source: { asset: keetaUSD, location: keetaChain, rail: 'KEETA_SEND', value: amount },
      destination: { asset: keetaEUR, location: keetaChain, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }

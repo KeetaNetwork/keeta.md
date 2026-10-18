@@ -19,7 +19,10 @@ Use [send-receive-tokens](../send-receive-tokens/SKILL.md) for wallet-to-wallet 
 Install the client SDK and the x402 packages (verified with `@x402/*` 2.28.0 and `@keetanetwork/keetanet-client` 0.18.8):
 
 ```bash
-npm install @keetanetwork/keetanet-client @x402/core @x402/keeta @x402/fetch @x402/express
+npm init -y && npm pkg set type=module      # Node.js 24
+# @x402/keeta pins an older @keetanetwork/anchor. Set overrides before the first install to keep one copy:
+npm pkg set 'overrides.@keetanetwork/anchor=$@keetanetwork/anchor' 'overrides.@keetanetwork/keetanet-client=$@keetanetwork/keetanet-client'
+npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x402/core@2.28.0 @x402/keeta@2.28.0 @x402/fetch@2.28.0 @x402/express@2.28.0
 ```
 
 ### Buyer: pay for a request

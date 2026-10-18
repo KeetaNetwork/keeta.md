@@ -44,7 +44,8 @@ The steps after the first use `const am = new KeetaAnchor.AssetMovement.Client(c
 Every Keeta wallet can get a free deposit address on Base from Keeta's own bridge, with no KYC: KTA, USDC, EURC and cbBTC sent there arrive in the wallet as the same token on Keeta. Other chains work the same way through chained providers. This is the same lookup Keeta Personal runs on its Receive screen. Save the script below as `deposit-address.mts` and run it with `KEETA_SEED` set. It needs nothing else, not even a token address:
 
 ```bash
-npm install @keetanetwork/keetanet-client @keetanetwork/anchor tsx
+npm init -y && npm pkg set type=module   # Node.js 24; see the keeta quickstart
+npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 tsx
 KEETA_SEED=… KEETA_NETWORK=main npx tsx deposit-address.mts          # KEETA_FROM_CHAIN=chain:evm:42161 for Arbitrum
 ```
 
@@ -139,7 +140,7 @@ for (const p of providers) {
 const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
 if (!provider || !(await provider.isOperationSupported('createPersistentForwarding'))) throw new Error('no Base deposit route');
 const { address } = await provider.createPersistentForwardingAddress({
-  account, asset: keetaUSDC,                       // the Keeta token from the pairs above
+  account, asset: keetaUSDC,                       // a Keeta token from the pairs above, or await tokenFor('$USDC') (keeta quickstart)
   sourceLocation: base, destinationLocation: keeta,
   destinationAddress: account.publicKeyString.get()
 });
@@ -186,8 +187,13 @@ The script in the first step covers every chain: set `KEETA_FROM_CHAIN` to the s
 ### Withdraw to any other chain
 
 ```ts
+import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
+
+const chaining = new AnchorChaining({ client, resolver });
+const keetaUSDC = await tokenFor('$USDC');                       // helper from the keeta quickstart
 const plan = (await chaining.getPlans({
   source: { asset: keetaUSDC, location: keeta, rail: 'KEETA_SEND', value: amount },
+  // USDC on Arbitrum One (main). For Base use `base` and the token's Base contract; KTA is `client.baseToken`.
   destination: { asset: 'evm:0xaf88d065e77c8cC2239327C5EDb3A432268e5831', location: 'chain:evm:42161', rail: 'EVM_SEND', recipient: evmRecipient }
 }))?.[0];
 if (!plan) throw new Error('no route to that chain and token');
@@ -207,7 +213,7 @@ const result = await plan.execute({ requireSendAuth: true });
 
 ### Track a transfer
 
-- Poll `transfer.getTransferStatus()` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true, then confirm the balance on the destination chain.
+- Poll `(await transfer.getTransferStatus()).transaction.status` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true, then confirm the balance on the destination chain.
 - Only `COMPLETE` is standard. Other statuses belong to each provider. Report them verbatim:
   - Keeta EVM anchor: `CREATED`, `SOURCE_*`, `DESTINATION_*`, `FAILED_VALUE_TOO_LOW`
   - Bridge.xyz: `SOURCE_DEPOSIT_AWAITING_SEND`, `DESTINATION_WITHDRAW_TX_CONFIRMING`, `DESTINATION_UNDELIVERABLE`, `TRANSACTION_RETURNED`, `INTERNAL_ERROR_SUPPORT_NEEDED`
