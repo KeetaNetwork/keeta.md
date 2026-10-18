@@ -9,6 +9,11 @@ const EXPECT = {
 	facts: [/network facts match the skills/],
 	// The quickstart reads the new wallet's address and KTA decimals, and finds test USDC through the resolver.
 	quickstart: [/Address: keeta_a/, /KTA balance \(base units\): 0n decimals: \d+/, /USDC token: keeta_a\w+ decimals: \d+/],
+	// A new wallet holds nothing, but the balances script still describes KTA from its metadata.
+	balances: [/0 token\(s\) held on test by keeta_a/, /official: '\$KTA'/, /decimals: 18/],
+	history: [/0 transaction\(s\) for keeta_a/],
+	// Quoting needs no balance. The count is checked loosely; the log shows which providers answered.
+	'swap-quote': [/\d+ plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on test/],
 	// Keeta's own Base bridge must give this wallet a Base Sepolia address for test USDC.
 	'deposit-addresses': [/on: 'chain:evm:84532',\s+to: '0x[0-9a-fA-F]{40}',[^}]*providers: \[ 'evm-anchor' \]/]
 };

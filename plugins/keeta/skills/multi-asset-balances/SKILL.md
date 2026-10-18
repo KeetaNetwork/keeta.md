@@ -12,50 +12,109 @@ Use when an agent must list an account's assets, check one token before a transf
 
 ## SDK steps
 
-1. Build a `UserClient` for the selected network. A read-only client works for any address: `KeetaNet.UserClient.fromNetwork(network, null)`, then pass `{ account }` to reads.
-2. Read balances. They are always `bigint` base units:
+### "What's in my wallet?" (every balance, with names and amounts)
 
-   ```ts
-   const all = await client.allBalances();                    // [{ token, balance }]
-   const kta = await client.balance(client.baseToken);
-   const vault = await client.allBalances({ account: vaultAccount }); // a storage account you can read
-   ```
+This script lists every token the account holds, plus KTA for fees, with the ticker, name, decimals, the formatted amount and whether the token is in the network's official list. Set it up like the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) (Node 24, `type: module`, pinned SDKs), save it as `balances.mts`, and run `KEETA_SEED=… npx tsx balances.mts`. To read any other address without its seed, set `KEETA_ADDRESS` instead.
 
-3. Identify each token from the chain, and cross-check it against the network's official token list:
+```ts
+// live-test: balances
+import * as KeetaNet from '@keetanetwork/keetanet-client';
+import * as KeetaAnchor from '@keetanetwork/anchor';
+import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
+import { decodeTokenMetadata } from '@keetanetwork/anchor/lib/token-metadata.js';
+import type { TokenAddress } from '@keetanetwork/keetanet-client/lib/account.js';
 
-   ```ts
-   import * as KeetaAnchor from '@keetanetwork/anchor';
-   import type { TokenAddress } from '@keetanetwork/keetanet-client/lib/account.js';
+const { Account } = KeetaNet.lib;
+const network = process.env.KEETA_NETWORK === 'main' ? 'main' : 'test';
+const explorer = network === 'main' ? 'https://explorer.keeta.com' : 'https://explorer.test.keeta.com';
+const signer = process.env.KEETA_SEED ? Account.fromSeed(process.env.KEETA_SEED, 0) : null;
+const address = process.env.KEETA_ADDRESS ?? signer?.publicKeyString.get();
+if (!address) throw new Error('set KEETA_SEED (your wallet) or KEETA_ADDRESS (any wallet, read-only)');
+const owner = Account.fromPublicKeyString(address);
 
-   const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
-   const official = new Map((await resolver.listTokens()).map(({ token, currency }) => [token, currency]));
+// A client without a signer reads any account. The resolver signs only when there is a signer.
+const client = KeetaNet.UserClient.fromNetwork(network, signer);
+const resolver = new KeetaAnchor.lib.Resolver({
+  ...getDefaultResolverConfig(client),
+  ...(signer ? { metadataConfig: { signing: { account: signer } } } : {})
+});
 
-   async function describe(token: TokenAddress) {
-     const { info } = await client.client.getAccountInfo(token);
-     const raw = KeetaNet.lib.Utils.Helper.bufferToArrayBuffer(Buffer.from(info.metadata, 'base64'));
-     let json: ArrayBuffer;
-     try { json = KeetaNet.lib.Utils.Buffer.ZlibInflate(raw); } catch { json = raw; }
-     let decimals: number | null = null;
-     try { decimals = Number(JSON.parse(Buffer.from(json).toString('utf-8')).decimalPlaces); } catch { /* no metadata */ }
-     const address = token.publicKeyString.get();
-     return {
-       address,
-       ticker: info.name,                                     // token name is the ticker
-       displayName: info.description,
-       decimals: Number.isInteger(decimals) ? decimals : null,
-       officialCurrency: official.get(address) ?? null        // null = not in the network's token list
-     };
-   }
+function format(amount: bigint, decimals: number): string {
+  const base = 10n ** BigInt(decimals);
+  const fraction = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+  return fraction ? `${amount / base}.${fraction}` : `${amount / base}`;
+}
 
-   function format(amount: bigint, decimals: number): string {
-     const base = 10n ** BigInt(decimals);
-     const fraction = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
-     return fraction ? `${amount / base}.${fraction}` : `${amount / base}`;
-   }
-   ```
+try {
+  const official = new Map((await resolver.listTokens()).map(({ token, currency }) => [token, currency]));
+  const held = await client.allBalances({ account: owner });
+  const rows: { token: TokenAddress; balance: bigint }[] = held.map(({ token, balance }) => ({ token, balance }));
+  if (!rows.some(({ token }) => token.comparePublicKey(client.baseToken))) rows.unshift({ token: client.baseToken, balance: 0n });
 
-4. For each balance, report the network, account, token address, raw amount, and the ticker plus formatted amount when decimals are known. Show the explorer link for the token: `https://explorer.test.keeta.com/token/<address>` or `https://explorer.keeta.com/token/<address>`.
-5. To prove a transfer settled, compare a fresh read with the expected token and amount, and find the matching entry in `history({ depth: 25 })` (see the `keeta` skill's `references/transactions.md`).
+  console.log(`${held.length} token(s) held on ${network} by ${address}`);
+  for (const { token, balance } of rows) {
+    const tokenAddress = token.publicKeyString.get();
+    const { info } = await client.client.getAccountInfo(token);
+    let decimals: number | null = null;
+    try { decimals = info.metadata ? decodeTokenMetadata(info.metadata).decimalPlaces : null; } catch { /* unreadable metadata */ }
+    console.log({
+      ticker: info.name,                                       // the token's name is its ticker
+      name: info.description,
+      official: official.get(tokenAddress) ?? 'NOT IN THE NETWORK TOKEN LIST',
+      amount: decimals === null ? 'unknown decimals' : format(balance, decimals),
+      baseUnits: balance,
+      decimals,
+      token: `${explorer}/token/${tokenAddress}`
+    });
+  }
+} finally {
+  await client.destroy();
+}
+```
+
+- Report each row as the formatted amount and ticker, for example "12.5 USDC", and keep the token link. Never add different tokens into one total, and never convert `bigint` to `number` for arithmetic on money.
+- A row whose `official` value is `NOT IN THE NETWORK TOKEN LIST` but whose ticker looks like a known asset (`USDC`, `USD`, `KTA`) may be a spoof. Label it unverified.
+- To check one token before a payment, read `await client.balance(token)` and the KTA balance for fees (`client.balance(client.baseToken)`). Storage accounts you can read work the same way: `client.allBalances({ account: vault })`.
+
+### "What did I do recently?" (wallet history)
+
+`UserHistory` folds raw blocks into wallet-style rows (send, receive, swap, deposit, withdraw, bridge), the way Keeta Personal shows them. It reads the chain only, so it works with the same client:
+
+```ts
+// live-test: history
+import * as KeetaNet from '@keetanetwork/keetanet-client';
+import * as KeetaAnchor from '@keetanetwork/anchor';
+import type { HistorySource } from '@keetanetwork/anchor/lib/history.js';
+
+const { Account } = KeetaNet.lib;
+const network = process.env.KEETA_NETWORK === 'main' ? 'main' : 'test';
+const signer = process.env.KEETA_SEED ? Account.fromSeed(process.env.KEETA_SEED, 0) : null;
+const address = process.env.KEETA_ADDRESS ?? signer?.publicKeyString.get();
+if (!address) throw new Error('set KEETA_SEED (your wallet) or KEETA_ADDRESS (any wallet, read-only)');
+
+const client = KeetaNet.UserClient.fromNetwork(network, signer);
+try {
+  // The anchor package ships its own copy of the client (same version), so TypeScript sees two Block classes.
+  const history = new KeetaAnchor.lib.UserHistory({ history: client.client as unknown as HistorySource });
+  const rows = await history.list(address, { limit: 20 });   // newest first
+  console.log(`${rows.length} transaction(s) for ${address}`);
+  for (const row of rows) {
+    console.log(row.timestamp, row.type, row.direction, row.status, {
+      sent: row.send, received: row.receive, fee: row.fee, counterparty: row.counterparty?.id, blocks: row.refs.blockHashes
+    });
+  }
+} finally {
+  await client.destroy();
+}
+```
+
+- Amounts are base units of `send.token` or `receive.token`. Format them with that token's decimals, as in the balances script.
+- `provisional: true` marks a deposit or withdrawal inferred from the anchor reference on the block; check the anchor's transfer status before calling it final.
+- Page with `history.iterate(account, { limit })`, or pass the `cursor` option. For raw blocks, see the `keeta` skill's [transactions reference](../keeta/references/transactions.md).
+
+### Prove a transfer settled
+
+Take a fresh balance read after the expected transfer, compare it with the read from before, and find the matching row in the history (same token, amount and counterparty). For an anchor flow, also check the anchor's transfer status.
 
 ## Confirmations
 
