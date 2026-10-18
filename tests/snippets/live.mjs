@@ -13,7 +13,7 @@ const EXPECT = {
 	balances: [/0 token\(s\) held on test by keeta_a/, /official: '\$KTA'/, /decimals: 18/],
 	history: [/0 transaction\(s\) for keeta_a/],
 	// Quoting needs no balance. The count is checked loosely; the log shows which providers answered.
-	'swap-quote': [/\d+ plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on test/],
+	'swap-quote': [/\d+ plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on test/, /can convert into: /],
 	// Keeta's own Base bridge must give this wallet a Base Sepolia address for test USDC.
 	'deposit-addresses': [/on: 'chain:evm:84532',\s+to: '0x[0-9a-fA-F]{40}',[^}]*providers: \[ 'evm-anchor' \]/]
 };
