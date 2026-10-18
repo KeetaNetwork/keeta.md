@@ -84,7 +84,13 @@ try {
   console.log(`${plans.length} plan(s) for ${format(value, fromDecimals)} ${from.publicKeyString.get()} -> ${to.publicKeyString.get()} on ${network}`);
   // What this source converts into on this network, whether or not the requested pair has a route.
   const { to: reachable } = await chaining.graph.resolveAssetsWithMetadata({ from: { asset: from, location: keeta }, to: { location: keeta } });
-  console.log('can convert into:', reachable.flatMap((asset) => typeof asset.asset === 'string' ? [] : [asset.metadata?.ticker ?? asset.asset.publicKeyString.get()]).join(', ') || 'nothing');
+  const names: string[] = [];
+  for (const { asset } of reachable) {
+    if (typeof asset === 'string' || asset.comparePublicKey(from)) continue;
+    const { info } = await client.client.getAccountInfo(asset);
+    names.push(`${info.name || '(unnamed)'} ${asset.publicKeyString.get()}`);
+  }
+  console.log('can convert into:', names.join(', ') || 'nothing');
   for (const result of results) {
     if (!result.success) console.log({ unavailableVia: result.failedAt.providerID, reason: result.error instanceof Error ? result.error.message : String(result.error) });
   }

@@ -45,6 +45,7 @@ Use for a direct on-chain transfer of a specific Keeta token, or to tell someone
      import * as KeetaAnchor from '@keetanetwork/anchor';
 
      const usernames = new KeetaAnchor.Username.Client(client, { resolver });
+     if (!(await resolver.lookup('username', {}))?.length) throw new Error('this network lists no username provider: ask for the Keeta address instead');
      const name = '@Alice'.trim().replace(/^@/, '').toLowerCase();         // names are stored lowercase
      type Match = NonNullable<Awaited<ReturnType<typeof usernames.resolve>>>;
      const matches = Object.values((await usernames.resolveMulti(name)) ?? {}).filter((hit): hit is Match => hit != null);
@@ -54,6 +55,8 @@ Use for a direct on-chain transfer of a specific Keeta token, or to tell someone
      if (others.length) throw new Error('several providers know this name: ask which one');
      const recipient = only.account;
      ```
+
+     Today neither test nor main lists a username provider in its resolver (CI checks this daily), so expect that first error and ask the person for the recipient's `keeta_…` address. Never guess an address from a name.
 
      Show the full username with its provider (`alice$provider`) and the address it resolves to in the confirmation. To show who an incoming payment is from, `resolveMulti(senderAccount)` maps an account back to its usernames.
    - **The token is a ticker** ("send 5 USDC"). Get its address with the keeta quickstart's `tokenFor('$USDC')` (the resolver's token list for the network), never from memory.

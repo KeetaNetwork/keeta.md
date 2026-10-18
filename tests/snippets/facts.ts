@@ -55,6 +55,8 @@ for (const network of ['test', 'main'] as const) {
 		// x402-payments says @x402/keeta's test USDC doesn't exist and its main USDC matches the resolver.
 		if (network === 'test' && x402UsdcExists) problems.push('test: @x402/keeta USDC now exists; update the x402-payments warning');
 		if (network === 'main' && x402Usdc !== usdc) problems.push(`main: @x402/keeta USDC ${x402Usdc} differs from the resolver's ${usdc}`);
+		// send-receive-tokens says neither network lists a username provider yet.
+		if (usernameProviders !== 0) problems.push(`${network}: ${usernameProviders} username provider(s) now listed; update send-receive-tokens`);
 		if (unknownName !== null) problems.push(`${network}: an unknown username resolved to ${JSON.stringify(unknownName)}`);
 		if (!baseProviders.includes(stated.bridgeProvider)) problems.push(`${network}: Base providers are ${baseProviders.join(', ')}, skills name ${stated.bridgeProvider}`);
 	} finally {

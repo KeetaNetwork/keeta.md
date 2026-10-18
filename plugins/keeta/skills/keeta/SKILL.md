@@ -112,7 +112,7 @@ The anchor SDK needs **Node.js 24** and ES modules. Set up a project once:
 node --version                                  # must print v24.x
 npm init -y && npm pkg set type=module          # top-level await needs ES modules
 npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 tsx
-KEETA_SEED=… npx tsx quickstart.ts              # load the seed from your secret store
+KEETA_SEED=… npx tsx quickstart.ts              # load the seed from your secret store; KEETA_NETWORK=main for production
 ```
 
 ```ts
@@ -128,7 +128,10 @@ const { Account } = KeetaNet.lib;
 // Use your stored seed. Generate one only for a brand-new wallet, and save it in a secret store.
 const seed = process.env.KEETA_SEED ?? Account.generateRandomSeed({ asString: true });
 const account = Account.fromSeed(seed, 0);
-const client = KeetaNet.UserClient.fromNetwork('test', account);
+// The test network unless the user asked for main (production). Everything below works on both.
+const network = process.env.KEETA_NETWORK === 'main' ? 'main' : 'test';
+const explorer = network === 'main' ? 'https://explorer.keeta.com' : 'https://explorer.test.keeta.com';
+const client = KeetaNet.UserClient.fromNetwork(network, account);
 
 // One resolver for every anchor client. It signs metadata requests with the account, as Keeta Personal
 // does: some providers publish their routes only to signed requests, and an unsigned resolver misses them.
@@ -150,7 +153,7 @@ async function tokenFor(ticker: Parameters<typeof resolver.lookupToken>[0]): Pro
 
 try {
   const address = account.publicKeyString.get();
-  console.log('Address:', address, `https://explorer.test.keeta.com/account/${address}`);
+  console.log('Address:', address, 'on', network, `${explorer}/account/${address}`);
 
   const kta = client.baseToken;
   const decimals = await decimalsOf(kta);
