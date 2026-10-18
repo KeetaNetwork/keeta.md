@@ -39,22 +39,36 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
        --data "address=${KEETA_ADDRESS}&amount=10"
      ```
 
-     The reply is an HTML page and sends go out in batches, so don't parse the reply. The faucet sends only KTA, only to key-pair or storage accounts, and may be rate limited or empty. For test stablecoins, see [bridge-crypto](../bridge-crypto/SKILL.md) (Circle's test-USDC faucet plus a bridge).
+     From code, the same request is:
+
+     ```ts
+     await fetch('https://faucet.test.keeta.com/', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },     // exactly this: no ';charset' suffix
+       body: new URLSearchParams({ address: account.publicKeyString.get(), amount: '10' })   // whole test KTA
+     }).then((response) => response.text());                                  // HTML: ignore it, poll the balance (step 4)
+     ```
+
+     Asking the faucet moves none of the user's value, so it needs no approval. The reply is an HTML page and sends go out in batches, so don't parse the reply. The faucet sends only KTA, only to key-pair or storage accounts, and may be rate limited or empty. For test stablecoins, see [bridge-crypto](../bridge-crypto/SKILL.md) (Circle's test-USDC faucet plus a bridge).
    - **main:** there is no faucet. Funds arrive by:
      - a transfer the user sends from their own wallet, for example Keeta Personal at <https://wallet.keeta.com>;
      - a bank deposit into the user's own named US account, or a wire ([receive-bank-deposits](../receive-bank-deposits/SKILL.md));
      - a debit card top-up ([card-payments](../card-payments/SKILL.md));
      - stablecoins or other tokens bridged from another chain ([bridge-crypto](../bridge-crypto/SKILL.md)).
-4. Confirm the funds arrived by polling the balance. Don't trust a faucet reply or a sender's word:
+4. Confirm the funds arrived by polling the balance of the token you expect. Don't trust a faucet reply or a sender's word:
 
    ```ts
-   const before = await client.balance(client.baseToken);
+   // KTA from the faucet; for a deposit or bridge, the Keeta token the provider's path names (for example await tokenFor('$USDC')).
+   const expected = client.baseToken;
+   const before = await client.balance(expected);
    // ...request funds, then:
    for (let attempt = 0; attempt < 20; attempt++) {
-     if ((await client.balance(client.baseToken)) > before) break;
+     if ((await client.balance(expected)) > before) break;
      await KeetaNet.lib.Utils.Helper.asleep(15_000);
    }
    ```
+
+   To see everything that arrived, whatever the token, read `allBalances()` ([multi-asset-balances](../multi-asset-balances/SKILL.md)).
 
 5. Report the network, the address, an explorer link (`https://explorer.test.keeta.com/account/<address>` or `https://explorer.keeta.com/account/<address>`), and the balance in base units. Add a decimal amount only after you read the token's `decimalPlaces` ([multi-asset-balances](../multi-asset-balances/SKILL.md)).
 6. Call `await client.destroy()` when you are done.

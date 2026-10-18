@@ -27,7 +27,7 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
 
 ### Buyer: pay for a request
 
-1. Use a funded account on the network the resource asks for. For test, fund it from the faucet at <https://faucet.test.keeta.com/>, as described in [create-fund-wallet](../create-fund-wallet/SKILL.md).
+1. Use a funded account on the network the resource asks for. On test, the faucet gives only KTA ([create-fund-wallet](../create-fund-wallet/SKILL.md)); for a USDC-priced resource, also bridge Circle's test USDC from Base Sepolia ([bridge-crypto](../bridge-crypto/SKILL.md#whats-my-base-deposit-address-any-wallet-any-chain)), or pay a KTA-priced option when the seller offers one.
 2. Register the Keeta scheme, set spend controls, and gate signing on approval:
 
    ```ts
@@ -49,8 +49,11 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
    const signer = toClientKeetaSigner(account); // opens a UserClient; destroy it when done
    // Caps in base units, from each token's on-chain decimalPlaces; never assume the decimals.
    const reader = KeetaNet.UserClient.fromNetwork("test", null);
-   const decimalsOf = async (token: string) =>
-     decodeTokenMetadata((await reader.client.getAccountInfo(token)).info.metadata).decimalPlaces;
+   const decimalsOf = async (token: string) => {
+     const { metadata } = (await reader.client.getAccountInfo(token)).info;
+     if (!metadata) throw new Error(`${token} has no metadata, so its decimals are unknown`);
+     return decodeTokenMetadata(metadata).decimalPlaces;
+   };
    const usdc = await getUsdcAddress(KEETA_TESTNET_CAIP2);           // the resolver's $USDC, which exists on both networks
    const usdcCapBaseUnits = (5n * 10n ** BigInt(await decimalsOf(usdc)) / 100n).toString();               // 0.05 USDC
    const ktaCapBaseUnits = (10n ** BigInt(await decimalsOf(KTA_TESTNET_ADDRESS)) / 100n).toString();       // 0.01 KTA
@@ -60,7 +63,7 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
      const client = new x402Client()
        .register(KEETA_TESTNET_CAIP2, new ExactKeetaScheme(signer))
        .setSpendControls({
-         maxAmountPerPayment: "$0.05", // per-payment cap for default assets (USDC)
+         maxAmountPerPayment: "$0.05", // applies only to default assets without an entry below; the entries' caps take precedence
          allowedAssets: [
            // Opt in to each token explicitly, with an atomic (base-unit) cap
            { network: KEETA_TESTNET_CAIP2, asset: usdc, maxAmountPerPayment: usdcCapBaseUnits },
@@ -74,6 +77,7 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
        });
 
      const fetchWithPayment = wrapFetchWithPayment(fetch, client);
+     // The facilitator's own test-network demo route; for your seller below, use http://localhost:4021/weather.
      const response = await fetchWithPayment("https://facilitator.x402.keeta.com/weather");
      const result = await new x402HTTPClient(client).processResponse(response);
 
@@ -136,12 +140,13 @@ if (!kinds.some((kind) => kind.scheme === "exact" && kind.network === KEETA_TEST
 
 - Before signing, show the resource URL, the network (test or main), the asset address, the raw `amount` (plus a decimal amount only when decimals are verified), and `payTo`. Skip this only when a pre-approved policy covers that exact asset, cap, and resource.
 - Treat spend controls and `onBeforePaymentCreation` as client-side guardrails. They limit what this agent signs. The chain does not enforce them.
-- Confirm that the seller's `payTo` is an account the user controls, and run on test first.
+- When you run the seller, confirm that `payTo` is an account the user controls, and run on test first.
 - The known facilitator, `https://facilitator.x402.keeta.com`, is operated by an independent third party under the Keeta Grant Program. Keeta, Inc. does not operate it. Tell the user before relying on it, and do not substitute an unknown facilitator.
 
 ## Failures
 
-- `payment_required` after the retry: no registered scheme matched, spend controls filtered out every option, or the account lacks the asset. Report which one. Do not raise caps on your own.
+- `fetchWithPayment` throws `Failed to create payment payload: …` when spend controls filter out every option or your `onBeforePaymentCreation` hook aborts. Report the reason. Do not raise caps on your own.
+- `payment_required` after the retry: no registered scheme matched the seller's `accepts`, or the facilitator rejected the signed payment (balance or permissions). Report which one.
 - `settle_failed`: check the account's balance and history before retrying, so a payment that did land is not paid twice.
 - Concurrent payments from one account fail or conflict. Serialize them.
 - Unknown asset or decimals: show raw base units and do not convert.

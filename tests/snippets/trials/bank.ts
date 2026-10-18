@@ -138,8 +138,7 @@ try {
   const countries = await kyc.getSupportedCountries('individual');
   console.log(`KYC providers cover ${countries.length} countries for individuals${countries.length ? ` (incl. US: ${countries.map(String).includes('US')}, MX: ${countries.map(String).includes('MX')})` : ''}`);
   const kycProviders = await resolver.lookup('kyc', { countryCodes: ['US'], entityType: 'individual' });   // the user's country is unknown; US stands in for the lookup
-  const kycPlain = kycProviders ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(kycProviders) : null;
-  const kycNames = Array.isArray(kycPlain) ? kycPlain.map((p: unknown) => (p && typeof p === 'object' && 'id' in p ? String((p as { id: unknown }).id) : '?')) : [];
+  const kycNames = kycProviders ? Object.keys(kycProviders) : [];   // lookup results are keyed by provider ID
   console.log(`KYC providers listed: ${kycNames.length ? kycNames.join(', ') : '(none)'}`);
   if (!hasKYC) {
     next.push(countries.length

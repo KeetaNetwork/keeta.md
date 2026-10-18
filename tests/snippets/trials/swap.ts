@@ -41,9 +41,10 @@ async function tokenFor(tickerOrAddress: string): Promise<TokenAddress> {
   if (!hit) throw new Error(`no ${tickerOrAddress} token on ${network}; its tickers are ${tokens.map((t) => t.currency).join(', ')}`);
   return Account.fromPublicKeyString(hit.token).assertKeyType(Account.AccountKeyAlgorithm.TOKEN);
 }
+// A token without metadata (the test network's demo tokens) has unknown decimals: read and show its amounts as integer base units.
 async function decimalsOf(token: TokenAddress): Promise<number> {
   const { info } = await client.client.getAccountInfo(token);
-  if (!info.metadata) throw new Error(`${token.publicKeyString.get()} has no metadata, so its decimals are unknown`);
+  if (!info.metadata) { console.log(`${token.publicKeyString.get()} has no metadata: its amounts below are base units`); return 0; }
   return decodeTokenMetadata(info.metadata).decimalPlaces;
 }
 function toBaseUnits(amount: string, decimals: number): bigint {
@@ -192,8 +193,7 @@ try {
     // A small conversion: 0.1 KTA, well under the faucet grant, leaving KTA for fees.
     value = toBaseUnits('0.1', ktaDecimals);
     for (const candidate of reachable) {
-      const decimals = await decimalsOf(candidate).catch(() => null);
-      if (decimals === null) { console.log('skipping', candidate.publicKeyString.get(), '(unknown decimals)'); continue; }
+      const decimals = await decimalsOf(candidate);   // 0 (base units) for a demo token without metadata
       const q = await quote(chaining, kta, candidate, value, ktaDecimals, decimals);
       if (q.plans.length > 0) { to = candidate; toDecimals = decimals; candidates = q.plans; candidateSummaries = q.summaries; break; }
     }

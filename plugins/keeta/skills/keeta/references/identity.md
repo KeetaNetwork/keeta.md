@@ -70,7 +70,7 @@ try {
 }
 ```
 
-Show the user the provider, the attribute names and the principals before `shareKYCAttributes`, and wait for consent.
+Show the user the provider, the attribute names and the principals before `shareKYCAttributes`, and wait for consent. The task skills call this block, wrapped as a function of the error, `shareRequestedKYC(error)`.
 
 Opening a certificate with `subjectKey: account` decrypts its sensitive attributes locally. Keep the decrypted values out of logs, prompts and on-chain fields.
 

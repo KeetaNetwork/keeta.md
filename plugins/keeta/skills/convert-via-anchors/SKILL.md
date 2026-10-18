@@ -53,9 +53,10 @@ async function tokenFor(tickerOrAddress: string): Promise<TokenAddress> {
   if (!hit) throw new Error(`no ${tickerOrAddress} token on ${network}; its tickers are ${tokens.map((t) => t.currency).join(', ')}`);
   return Account.fromPublicKeyString(hit.token).assertKeyType(Account.AccountKeyAlgorithm.TOKEN);
 }
+// A token without metadata (the test network's demo tokens) has unknown decimals: read and show its amounts as integer base units.
 async function decimalsOf(token: TokenAddress): Promise<number> {
   const { info } = await client.client.getAccountInfo(token);
-  if (!info.metadata) throw new Error(`${token.publicKeyString.get()} has no metadata, so its decimals are unknown`);
+  if (!info.metadata) { console.log(`${token.publicKeyString.get()} has no metadata: its amounts below are base units`); return 0; }
   return decodeTokenMetadata(info.metadata).decimalPlaces;
 }
 function toBaseUnits(amount: string, decimals: number): bigint {
@@ -126,7 +127,7 @@ try {
 ```
 
 - Show the user every plan: what they send, what they receive (an estimate unless the step is a signed FX quote), each step's provider and every fee. Never pick one for them.
-- **Executing:** rerun with `KEETA_PLAN` set to the approved `route` string exactly as printed, `KEETA_MIN_RECEIVE` set to the least the user accepts (a decimal amount of the destination token, such as the receive amount they saw), and `KEETA_CONFIRMED=yes`. The rerun quotes again, because FX quotes expire about five minutes after they are signed, and stops if the route is gone or now gives less than `KEETA_MIN_RECEIVE`.
+- **Executing:** rerun with `KEETA_PLAN` set to the approved `route` string exactly as printed, `KEETA_MIN_RECEIVE` set to the least the user accepts (a decimal amount of the destination token, such as the receive amount they saw; base units for a token without metadata), and `KEETA_CONFIRMED=yes`. The rerun quotes again, because FX quotes expire about five minutes after they are signed, and stops if the route is gone or now gives less than `KEETA_MIN_RECEIVE`.
 - Fee `value`s are base units of the fee's own token; KTA network fees are paid on top at publish.
 - **Networks.** On main, KTA → USDC quotes through an FX anchor in one step (CI checks this daily). On test, KTA has no USDC route; it converts only into demo tokens, which the `can convert into` line lists, so test a swap with one of those: pass its `keeta_…` address as `KEETA_TO`.
 - A wallet with no balance still gets plans, so quoting is safe on a new wallet. `LEDGER_INVALID_BALANCE` at execution means it can't cover the amount plus KTA fees.
@@ -212,7 +213,7 @@ The steps below show the same flow one client at a time, for when you need a sin
 
 - **No providers or unsupported pair:** stop and report the criteria.
 - **Expired quote, changed rate or `QuoteValidationFailed`:** fetch a new quote and ask again.
-- **Unknown decimals:** show base units and don't execute on a misread amount.
+- **Unknown decimals:** a token without metadata has no decimals to read. Show its amounts as base units, say so, and never guess a scale.
 - **Ambiguous status:** poll `getExchangeStatus()` and check balances. Never create a second exchange blindly.
 - **Chaining failure:** `execute()` throws, and `plan.state` holds `completedSteps` and `failedAtStepIndex`. Reconcile, then plan only the remaining leg.
 - **Unknown endpoints:** never replace an unavailable provider with an endpoint you haven't reviewed.

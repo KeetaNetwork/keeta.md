@@ -33,7 +33,11 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
      defaultPermission: new Permissions(['ACCESS', 'STORAGE_DEPOSIT', 'STORAGE_CAN_HOLD']) }, { account: vault });
    setup.updatePermissions(agentAccount, new Permissions(['SEND_ON_BEHALF']), usdc, Block.AdjustMethod.SET, { account: vault }); // USDC only
    await setup.publish();
-   await client.send(vault, budgetBaseUnits, usdc);   // fund only this period's budget
+   // Fund only this period's budget, after the human approves it. Blocks published from the vault pay their
+   // KTA fee from the vault itself, not from the agent's account, so it also needs a little KTA.
+   if (!(await askApproval(`Fund vault ${vault.publicKeyString.get()} with ${budgetBaseUnits} base units of USDC and ${feeBudgetKta} of KTA for fees?`))) throw new Error('not approved');
+   await client.send(vault, budgetBaseUnits, usdc);
+   await client.send(vault, feeBudgetKta, client.baseToken);
 
    // The agent spends with its own key: agentClient.send(to, amount, usdc, ref, { account: vault })
    // Revoke immediately if needed:
@@ -54,7 +58,7 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 
 ## Confirmations
 
-- Always require approval for key or seed access, identity disclosure, new recipients, provider terms, policy changes, and widening a delegation.
+- Always require approval for funding or refilling a vault or agent account, key or seed access, identity disclosure, new recipients, provider terms, policy changes, and widening a delegation.
 - Require approval again when the network, token, amount, recipient, provider, quote, fee or instruction changes.
 - Keep signers outside the model's context, and give the model the narrowest signing interface possible.
 

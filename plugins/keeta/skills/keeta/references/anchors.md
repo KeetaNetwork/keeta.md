@@ -40,7 +40,14 @@ const tokens = await resolver.listTokens();                 // [{ token: 'keeta_
 const usd = await resolver.lookupToken('USD');              // { token, currency } | null; main only. '$KUSD' is the abstract dollar token, '$KBUSD' Bivo's (main)
 const kycCountries = await resolver.listSupportedKYCCountries('individual');
 const fx = await resolver.lookup('fx', { inputCurrencyCode: '$KTA', outputCurrencyCode: '$USDC' });
-const plain = fx ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(fx) : null; // inspect as JSON
+const plain = await toPlain(fx);   // { [providerID]: { ...metadata } } or undefined
+// Lookup results mix plain objects with lazy values, so resolve them one by one to inspect as JSON
+async function toPlain(v: unknown): Promise<unknown> {
+  if (typeof v === 'function') { try { return await toPlain(await v('any')); } catch { return null; } }
+  if (Array.isArray(v)) return Promise.all(v.map(toPlain));
+  if (v !== null && typeof v === 'object') return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await toPlain(x)])));
+  return v;
+}
 ```
 
 - **Pass one signed resolver to every client** (`new KeetaAnchor.FX.Client(client, { resolver })`, `new AnchorChaining({ client, resolver })`). A client builds its own resolver when you pass none, but that one doesn't sign: a provider whose metadata requires `keeta-account` authentication then fails with "Signing is requested, but no signing configuration is provided" or drops out of discovery.
