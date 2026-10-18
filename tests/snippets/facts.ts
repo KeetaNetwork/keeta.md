@@ -49,6 +49,40 @@ for (const network of ['test', 'main'] as const) {
 		const unknownName = await within(60, 'username lookup', new KeetaAnchor.Username.Client(client, { resolver }).resolveMulti(`no-such-user-${Date.now()}`));
 		const tokens = (await resolver.listTokens()).map((t) => `${t.currency}=${t.token}`);
 		console.log(JSON.stringify({ network, kta, usdc, x402Usdc, x402UsdcExists, baseProviders, usernameProviders, tokens }, null, 2));
+		// Bivo's Keeta tokens, read from its own paths (pay-out, receive-bank-deposits, card-payments, bridge-crypto).
+		const tickers = new Map<string, string>((await resolver.listTokens()).map((t) => [String(t.token), t.currency]));
+		const nameOf = (id: string): string => `${tickers.get(id) ?? '(unlisted)'}=${id}`;
+		const bivo: { [route: string]: { [provider: string]: string[] } } = {};
+		const routes = [[keeta, 'bank-account:us'], ['bank-account:us', keeta], [keeta, 'bank-account:iban-swift'], [stated.base, keeta]] as const;
+		for (const [from, to] of routes) {
+			const found = (await within(60, `providers ${from} -> ${to}`, am.getProvidersForTransfer({ from, to }).catch(() => null))) ?? [];
+			for (const p of found) {
+				const ids = new Set<string>();
+				for (const { paths } of p.serviceInfo.supportedAssets) {
+					for (const { pair: [a, b] } of paths) {
+						if (a.location === from && b.location === to) ids.add(String(from === keeta ? a.id : b.id));
+					}
+				}
+				(bivo[`${from} -> ${to}`] ??= {})[String(p.providerID)] = [...ids].map(nameOf);
+			}
+		}
+		// The stablecoin FX anchor converts each issuer's stablecoin 1:1 with the abstract currency token ($KBUSD <-> $KUSD).
+		const fx = new KeetaAnchor.FX.Client(client, { resolver });
+		const stable: { [pair: string]: unknown } = {};
+		for (const [fromTicker, toTicker] of [['$KBUSD', '$KUSD'], ['$KUSD', '$KBUSD'], ['$KBUSD', '$USDC'], ['USD', '$KBUSD']] as const) {
+			const fromHit = await resolver.lookupToken(fromTicker), toHit = await resolver.lookupToken(toTicker);
+			if (!fromHit || !toHit) { stable[`${fromTicker} -> ${toTicker}`] = 'token not listed'; continue; }
+			const fromToken = KeetaNet.lib.Account.fromPublicKeyString(fromHit.token).assertKeyType(KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
+			const toToken = KeetaNet.lib.Account.fromPublicKeyString(toHit.token).assertKeyType(KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
+			try {
+				const conversions = (await within(60, 'listPossibleConversions', fx.listPossibleConversions({ from: fromToken })))?.conversions.map(nameOf) ?? [];
+				const estimates = (await within(60, 'getEstimates', fx.getEstimates({ from: fromToken, to: toToken, amount: 1_000_000n, affinity: 'from' }))) ?? [];
+				stable[`${fromTicker} -> ${toTicker}`] = { conversions, estimates: estimates.map((e) => ({ provider: String(e.provider.providerID), out: String(e.estimate.convertedAmount) })) };
+			} catch (error) {
+				stable[`${fromTicker} -> ${toTicker}`] = error instanceof Error ? error.message : String(error);
+			}
+		}
+		console.log(JSON.stringify({ network, bivo, stable }, null, 2));
 
 		if (kta !== stated.kta) problems.push(`${network}: KTA is ${kta}, skills say ${stated.kta}`);
 		if (usdc !== stated.usdc) problems.push(`${network}: resolver $USDC is ${usdc}, skills say ${stated.usdc}`);
