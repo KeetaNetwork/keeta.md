@@ -111,7 +111,7 @@ try {
 }
 ```
 
-- **What it prints:** one entry per token and route: the token on the source chain, the deposit address (`to`), the Keeta token it arrives as, the providers on the route and their fees. Keeta's bridge (provider `keeta` on main) gives one address for all its Base tokens. A route that needs identity first, such as Bivo's USDC-to-dollars route, prints `unavailableVia` with the reason instead.
+- **What it prints:** one entry per token and route: the token on the source chain, the deposit address (`to`), the Keeta token it arrives as, the providers on the route and their fees. Keeta's bridge (provider `keeta` on main, `evm-anchor` on test) gives one address for all four of its Base tokens, with no fee lines. A route that needs onboarding or identity first, such as Bridge.xyz's or Bivo's, prints `unavailableVia` with the provider's reason (for example `User Not Onboarded to Asset Movement Service`) instead; the Keeta bridge address is still valid.
 - **Getting it is free and changes nothing on chain.** Asking again returns the same address, because the provider reuses the wallet's existing one. No approval is needed to look it up.
 - **Show it with its chain and tokens:** "Send only USDC, EURC, cbBTC or KTA on Base to `0x…`. Other tokens or networks are not watched and may be lost." List exactly the tokens the script printed for that address.
 - A deposit smaller than the network fee may not be credited. Deposits from Base work only through this address: `initiateTransfer` from an EVM source is rejected.
@@ -135,7 +135,7 @@ for (const p of providers) {
     a.location === base && b.location === keeta ? [String(a.id), String(b.id)] : null).filter((x) => x !== null));
   console.log(String(p.providerID), pairs, p.getLegalDisclaimers());
 }
-// On main, Keeta's own bridge is listed as provider `keeta`. Pick the provider and token the human approves.
+// Keeta's own bridge is provider `keeta` on main and `evm-anchor` on test. Pick the provider and token the human approves.
 const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
 if (!provider || !(await provider.isOperationSupported('createPersistentForwarding'))) throw new Error('no Base deposit route');
 const { address } = await provider.createPersistentForwardingAddress({

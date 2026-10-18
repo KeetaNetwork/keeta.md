@@ -6,7 +6,8 @@ import * as KeetaNet from '@keetanetwork/keetanet-client';
 
 // What each live test must print to pass. A test missing here fails, so a new one gets a check.
 const EXPECT = {
-	'deposit-addresses': [/to: '0x[0-9a-fA-F]{40}'/]
+	// Keeta's own Base bridge must give this wallet a Base Sepolia address for test USDC.
+	'deposit-addresses': [/on: 'chain:evm:84532',\s+to: '0x[0-9a-fA-F]{40}',[^}]*providers: \[ 'evm-anchor' \]/]
 };
 
 const tests = readdirSync(new URL('./live/', import.meta.url)).filter((name) => name.endsWith('.ts')).sort();
