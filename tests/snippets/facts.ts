@@ -16,7 +16,8 @@ const STATED = {
 		kta: 'keeta_anqdilpazdekdu4acw65fj7smltcp26wbrildkqtszqvverljpwpezmd44ssg',
 		usdc: 'keeta_amnkge74xitii5dsobstldatv3irmyimujfjotftx7plaaaseam4bntb7wnna',
 		base: 'chain:evm:8453',
-		bridgeProvider: 'keeta'
+		bridgeProvider: 'keeta',
+		kbusd: 'keeta_amg5vtcaylfhat3icwosxnibxf3ndimxnxfu3txbrwhra6ry75muct7d3lxwa'
 	}
 } as const;
 
@@ -68,21 +69,27 @@ for (const network of ['test', 'main'] as const) {
 		}
 		// The stablecoin FX anchor converts each issuer's stablecoin 1:1 with the abstract currency token ($KBUSD <-> $KUSD).
 		const fx = new KeetaAnchor.FX.Client(client, { resolver });
-		const stable: { [pair: string]: unknown } = {};
-		for (const [fromTicker, toTicker] of [['$KBUSD', '$KUSD'], ['$KUSD', '$KBUSD'], ['$KBUSD', '$USDC'], ['USD', '$KBUSD']] as const) {
+		const stable: { [pair: string]: string[] } = {};
+		for (const [fromTicker, toTicker] of [['$KBUSD', '$KUSD'], ['$KUSD', '$KBUSD']] as const) {
 			const fromHit = await resolver.lookupToken(fromTicker), toHit = await resolver.lookupToken(toTicker);
-			if (!fromHit || !toHit) { stable[`${fromTicker} -> ${toTicker}`] = 'token not listed'; continue; }
-			const fromToken = KeetaNet.lib.Account.fromPublicKeyString(fromHit.token).assertKeyType(KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
-			const toToken = KeetaNet.lib.Account.fromPublicKeyString(toHit.token).assertKeyType(KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
-			try {
-				const conversions = (await within(60, 'listPossibleConversions', fx.listPossibleConversions({ from: fromToken })))?.conversions.map(nameOf) ?? [];
-				const estimates = (await within(60, 'getEstimates', fx.getEstimates({ from: fromToken, to: toToken, amount: 1_000_000n, affinity: 'from' }))) ?? [];
-				stable[`${fromTicker} -> ${toTicker}`] = { conversions, estimates: estimates.map((e) => ({ provider: String(e.provider.providerID), out: String(e.estimate.convertedAmount) })) };
-			} catch (error) {
-				stable[`${fromTicker} -> ${toTicker}`] = error instanceof Error ? error.message : String(error);
-			}
+			if (!fromHit || !toHit) continue;
+			const [fromToken, toToken] = [fromHit.token, toHit.token].map((t) => KeetaNet.lib.Account.fromPublicKeyString(t).assertKeyType(KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN));
+			if (!fromToken || !toToken) continue;
+			const estimates = (await within(60, `${fromTicker} -> ${toTicker} estimates`, fx.getEstimates({ from: fromToken, to: toToken, amount: 1_000_000n, affinity: 'from' }).catch(() => null))) ?? [];
+			stable[`${fromTicker} -> ${toTicker}`] = estimates.map((e) => `${String(e.provider.providerID)}: ${String(e.estimate.convertedAmount)}`);
 		}
 		console.log(JSON.stringify({ network, bivo, stable }, null, 2));
+		if (network === 'main') {
+			// pay-out and receive-bank-deposits say main Bivo pays from USD and is moving to $KBUSD.
+			const kbusd = (await resolver.lookupToken('$KBUSD'))?.token ?? null;
+			if (kbusd !== STATED.main.kbusd) problems.push(`main: $KBUSD is ${kbusd}, skills expect ${STATED.main.kbusd}`);
+			const bivoUS = Object.entries(bivo[`${keeta} -> bank-account:us`] ?? {}).filter(([id]) => id.includes('bivo')).flatMap(([, ids]) => ids);
+			if (!bivoUS.length || !bivoUS.every((t) => t.startsWith('USD=') || t.startsWith('$KBUSD='))) problems.push(`main: Bivo's US payout tokens are ${bivoUS.join(', ') || 'none'}, skills say USD or $KBUSD`);
+			// convert-via-anchors says the stablecoin FX anchor converts $KBUSD <-> $KUSD on main.
+			for (const pair of ['$KBUSD -> $KUSD', '$KUSD -> $KBUSD']) {
+				if (!(stable[pair] ?? []).some((e) => e.includes('stablecoin'))) problems.push(`main: no stablecoin FX estimate for ${pair} (${(stable[pair] ?? []).join(', ') || 'none'})`);
+			}
+		}
 
 		if (kta !== stated.kta) problems.push(`${network}: KTA is ${kta}, skills say ${stated.kta}`);
 		if (usdc !== stated.usdc) problems.push(`${network}: resolver $USDC is ${usdc}, skills say ${stated.usdc}`);

@@ -13,7 +13,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
 | Direction | Rail | What happens | Typical time |
 | --- | --- | --- | --- |
 | **Push to card** (payout) | `CARD_PUSH` | Visa Direct sends money from the user's Keeta balance to their debit card | About a minute |
-| **Pull from card** (funding) | `CARD_PULL` | The user's card is charged, and the amount is credited to their Keeta USD balance | A few minutes |
+| **Pull from card** (funding) | `CARD_PULL` | The user's card is charged, and the amount is credited to Bivo's Keeta USD token (USD on main, moving to `$KBUSD`) | A few minutes |
 
 - **Provider:** Bivo Inc. (NMLS #2572288), a licensed money transmitter, provides card transfers on Keeta through Visa Direct. The user completes Bivo onboarding first (KYC, as in [receive-bank-deposits](../receive-bank-deposits/SKILL.md)).
 - **Own cards only:** a linked card belongs to the user's own profile, so pay only cards the user owns. To pay someone else, use [pay-out](../pay-out/SKILL.md) to their bank account, or [send-receive-tokens](../send-receive-tokens/SKILL.md) to their Keeta address.

@@ -17,13 +17,13 @@ Anchors are off-chain services that connect Keeta to the outside world. They pub
 
 | Provider | Service | What it offers on Keeta | Networks | Identity |
 | --- | --- | --- | --- | --- |
-| **Bivo** (Bivo Inc., NMLS #2572288, licensed money transmitter) | asset movement | Named US bank accounts (ACH) in the user's name; wire, RTP and SWIFT deposit instructions; payouts in local currency in more than 60 countries; international wires; conversions between its Keeta fiat tokens; Visa Direct card push and pull | main, test | Individual KYC |
+| **Bivo** (Bivo Inc., NMLS #2572288, licensed money transmitter) | asset movement | Named US bank accounts (ACH) in the user's name; wire, RTP and SWIFT deposit instructions; payouts in local currency in more than 60 countries; international wires; conversions between its Keeta fiat tokens (USD, EUR… on main, moving to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`…); Visa Direct card push and pull | main, test | Individual KYC |
 | **Bridge.xyz** | asset movement | USD by ACH or wire to and from US accounts against Keeta USDC; EUR by SEPA from Keeta EURC; USDC with Ethereum, Arbitrum, Avalanche and Polygon; Ethereum USDT and PYUSD into Keeta USDC | main, test (USDC only) | Individual KYC plus Bridge's terms of service |
 | **Keeta EVM anchor** | asset movement | Keeta's own bridge with Base for KTA, USDC, EURC and cbBTC, with no bridge fee | main (Base), test (Base Sepolia) | None |
 | **LayerZero** (Virtual Transfer anchor) | asset movement | Bridges and swaps about 50 tokens across 10 EVM chains, with Solana as a destination. It never touches Keeta, so routes chain it with the Keeta EVM anchor through Base. | main | None |
 | **OneFootprint** | KYC | Hosted identity verification that issues a reusable Keeta KYC certificate | main, test | — |
 | **Keeta KYB provider** | KYC (`entityType: 'business'`) | Business verification for companies incorporated in 33 countries | where listed | — |
-| **Stablecoin FX anchor** | FX | 1:1 conversions between stablecoins of the same currency | test | None |
+| **Stablecoin FX anchor** | FX | 1:1 conversions between an issuer's stablecoin and Keeta's abstract currency token (`$KBUSD` ↔ `$KUSD`, `$KBEUR` ↔ `$KEUR`…); one issuer to another chains two legs | main | None |
 
 Who may use each provider (individuals or businesses, and regional limits) is in "Match services to your principal" in [SKILL.md](../SKILL.md).
 
@@ -34,7 +34,7 @@ Workflows: [receive-bank-deposits](../../receive-bank-deposits/SKILL.md), [pay-o
 ```ts
 const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
 const tokens = await resolver.listTokens();                 // [{ token: 'keeta_…', currency: 'USD' | '$KTA' | … }]
-const usd = await resolver.lookupToken('USD');              // { token, currency } | null; main only, test uses '$KUSD'
+const usd = await resolver.lookupToken('USD');              // { token, currency } | null; main only. '$KUSD' is the abstract dollar token, '$KBUSD' Bivo's (main)
 const kycCountries = await resolver.listSupportedKYCCountries('individual');
 const fx = await resolver.lookup('fx', { inputCurrencyCode: '$KTA', outputCurrencyCode: '$USDC' });
 const plain = fx ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(fx) : null; // inspect as JSON

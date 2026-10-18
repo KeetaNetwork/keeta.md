@@ -13,14 +13,15 @@ Use for an on-chain conversion once the exact source and destination assets are 
 | Conversion | Provider | How it runs |
 | --- | --- | --- |
 | KTA ↔ USD and other token pairs | FX anchors | `FX.Client`: signed quotes, then `createExchange()` |
-| USD ↔ EUR, GBP, CAD, MXN, JPY, AED, HKD, CNY (Bivo's Keeta fiat tokens) | Bivo | Asset-movement transfers on Keeta, which anchor chaining plans for you |
-| Stablecoin ↔ stablecoin of the same currency, 1:1 | Stablecoin FX anchor (test network) | `FX.Client`; one stablecoin to another takes two hops through chaining |
+| USD ↔ EUR, GBP, CAD, MXN, JPY, AED, HKD, CNY (Bivo's Keeta fiat tokens, moving to `$KBUSD`, `$KBEUR` and the other `$KB` tokens) | Bivo | Asset-movement transfers on Keeta, which anchor chaining plans for you |
+| An issuer's stablecoin ↔ Keeta's abstract currency token, 1:1 (`$KBUSD` ↔ `$KUSD`, `$KBEUR` ↔ `$KEUR`…) | Keeta's stablecoin FX anchor (main) | `FX.Client`; one issuer's stablecoin to another's is two hops through the abstract token, which chaining plans |
 | Tokens on other chains, such as USDT0 to USDC | LayerZero | See [bridge-crypto](../bridge-crypto/SKILL.md) |
 
 - **The simplest path for any pair is anchor chaining** (step 6): one call finds every route across FX anchors and asset-movement conversions, so you can compare plans.
 - **Bivo's fiat conversions are forward-quoted:** you fix the amount you send, and the amount received is an estimate. They need Bivo onboarding (individuals with KYC; see [receive-bank-deposits](../receive-bank-deposits/SKILL.md)).
+- **`$K` and `$KB` tokens.** `$KUSD`, `$KEUR` and the other `$K` tokens are Keeta's abstract currency tokens, one per currency. `$KBUSD`, `$KBEUR` and the other `$KB` tokens are Bivo's stablecoins. The stablecoin FX anchor converts each issuer's stablecoin 1:1 with its currency's abstract token, scaling base units when decimals differ; any fee shows in the quote's `cost`. On main, CI checks `$KBUSD` ↔ `$KUSD` daily. Test lists `$KUSD` and `$KEUR` but no `$KB` tokens yet.
 - **Token addresses** come from `resolver.listTokens()` (the network's currency map) or a provider's paths. Never copy them from an example for main.
-- **Documented test corridors:** KTA → USD through the demo FX anchor, and USD → EUR across several hops with anchor chaining. These examples show the SDK flow; they don't prove a provider is available right now, so always discover at run time.
+- **Checked corridors:** on main, KTA → USDC through an FX anchor and `$KBUSD` ↔ `$KUSD` through the stablecoin FX anchor (CI checks both daily); on test, KTA converts only into demo tokens. These don't prove a provider is available to this account right now, so always discover at run time.
 
 ## SDK steps
 
@@ -174,7 +175,7 @@ The steps below show the same flow one client at a time, for when you need a sin
 
    const chaining = new AnchorChaining({ client, resolver });
    const keetaChain = `chain:keeta:${client.network}` as const;
-   const keetaUSD = await tokenFor('USD'), keetaEUR = await tokenFor('EUR');   // keeta quickstart helper; on test use '$KUSD' and '$KEUR'
+   const keetaUSD = await tokenFor('USD'), keetaEUR = await tokenFor('EUR');   // Bivo's main tokens today ('$KBUSD' and '$KBEUR' as Bivo migrates); on test, take Bivo's token from its paths
    const plans = await chaining.getPlans({
      source: { asset: keetaUSD, location: keetaChain, rail: 'KEETA_SEND', value: amount },
      destination: { asset: keetaEUR, location: keetaChain, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }
