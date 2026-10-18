@@ -83,3 +83,20 @@ jobs:
       - run: npm ci
       - name: Run each live-test block with a new wallet on both networks
         run: npm run live
+
+  trials:
+    name: Agent trials
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/snippets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tests/snippets/package-lock.json
+      - run: npm ci
+      - name: Run the programs agents wrote from the skills, on test (funded) and main (read-only)
+        run: npm run trials
