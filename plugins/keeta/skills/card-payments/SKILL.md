@@ -32,6 +32,8 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 1. Confirm that the user has finished onboarding with the provider ([complete-kyc](../complete-kyc/SKILL.md)), the network, and the direction.
 2. Discover providers with card rails:
 
@@ -44,6 +46,12 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    for (const p of providers) console.log(String(p.providerID), p.getLegalDisclaimers());
    const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
    if (!provider) throw new Error('card payouts are not available to this account on this network');
+
+   // The provider's Keeta USD token, read from its card paths: test and main list different USD tokens.
+   const usdId = provider.serviceInfo.supportedAssets.flatMap(({ paths }) => paths)
+     .flatMap(({ pair: [a, b] }) => a.location === keeta && String(b.location).startsWith('bank-account:') ? [String(a.id)] : [])[0];
+   if (!usdId) throw new Error('this provider lists no Keeta token for card payouts');
+   const usdToken = KeetaAnchor.KeetaNet.lib.Account.fromPublicKeyString(usdId).assertKeyType(KeetaAnchor.KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
    ```
 
    - Card paths normally use the location `bank-account:card`; some USD corridors list card payouts under `bank-account:us`. Use the location and currency pairs from the provider's paths (`provider.serviceInfo.supportedAssets`).
@@ -74,6 +82,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    });
    const send = push.instructions.find((i) => i.type === 'KEETA_SEND');
    if (!send || send.type !== 'KEETA_SEND') throw new Error('no KEETA_SEND instruction');
+   if (send.external === undefined) throw new Error('the instruction has no external reference; pay through AnchorChaining instead (pay-out)');
    // Show the card's last four digits, the amount, fees and estimated amount received; get approval; then:
    await client.send(send.sendToAddress, BigInt(send.value), send.tokenAddress, send.external);
    ```
@@ -95,7 +104,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    console.log(status.transaction.status);
    ```
 
-6. Poll `(await transfer.getTransferStatus()).transaction.status` until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true. Report other statuses verbatim. A pull stays `PENDING` until it is submitted, then moves to `PROCESSING`.
+6. Poll `(await push.getTransferStatus()).transaction.status` (or `pull.…` for a charge) until `KeetaAnchor.lib.isCompletedTransferStatus(status)` is true. Report other statuses verbatim. A pull stays `PENDING` until it is submitted, then moves to `PROCESSING`.
 7. To unlink a card, call `provider.deactivatePersistentForwardingTemplate({ id, account })`. This also removes the card from the provider.
 
 ## Confirmations

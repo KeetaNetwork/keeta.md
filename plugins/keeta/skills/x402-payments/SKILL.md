@@ -35,18 +35,26 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
    import { x402Client } from "@x402/core/client";
    import { x402HTTPClient } from "@x402/core/http";
    import { wrapFetchWithPayment } from "@x402/fetch";
+   import { decodeTokenMetadata } from "@keetanetwork/anchor/lib/token-metadata.js";
    import {
      ExactKeetaScheme,
      KEETA_TESTNET_CAIP2,
      KTA_TESTNET_ADDRESS,
+     getUsdcAddress,
      toClientKeetaSigner,
    } from "@x402/keeta";
 
    // Load the seed from your secret store. Never print, log, or commit it.
    const account = KeetaNet.lib.Account.fromSeed(process.env.KEETA_SEED!, 0);
    const signer = toClientKeetaSigner(account); // opens a UserClient; destroy it when done
-   // KTA cap in base units. Derive it from KTA's on-chain decimalPlaces; never assume the decimals.
-   const ktaCapBaseUnits = "1000000";
+   // Caps in base units, from each token's on-chain decimalPlaces; never assume the decimals.
+   const reader = KeetaNet.UserClient.fromNetwork("test", null);
+   const decimalsOf = async (token: string) =>
+     decodeTokenMetadata((await reader.client.getAccountInfo(token)).info.metadata).decimalPlaces;
+   const usdc = await getUsdcAddress(KEETA_TESTNET_CAIP2);           // the resolver's $USDC, which exists on both networks
+   const usdcCapBaseUnits = (5n * 10n ** BigInt(await decimalsOf(usdc)) / 100n).toString();               // 0.05 USDC
+   const ktaCapBaseUnits = (10n ** BigInt(await decimalsOf(KTA_TESTNET_ADDRESS)) / 100n).toString();       // 0.01 KTA
+   await reader.destroy();
 
    try {
      const client = new x402Client()
@@ -54,7 +62,8 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
        .setSpendControls({
          maxAmountPerPayment: "$0.05", // per-payment cap for default assets (USDC)
          allowedAssets: [
-           // Opt in to KTA explicitly, with an atomic (base-unit) cap
+           // Opt in to each token explicitly, with an atomic (base-unit) cap
+           { network: KEETA_TESTNET_CAIP2, asset: usdc, maxAmountPerPayment: usdcCapBaseUnits },
            { network: KEETA_TESTNET_CAIP2, asset: KTA_TESTNET_ADDRESS, maxAmountPerPayment: ktaCapBaseUnits },
          ],
        })
@@ -87,7 +96,7 @@ npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 @x
 import express from "express";
 import { x402ResourceServer, HTTPFacilitatorClient } from "@x402/core/server";
 import { paymentMiddleware } from "@x402/express";
-import { KEETA_TESTNET_CAIP2, KTA_TESTNET_ADDRESS } from "@x402/keeta";
+import { KEETA_TESTNET_CAIP2, KTA_TESTNET_ADDRESS, getUsdcAddress } from "@x402/keeta";
 import { ExactKeetaScheme } from "@x402/keeta/exact/server";
 
 const app = express();
@@ -99,9 +108,9 @@ server.register(KEETA_TESTNET_CAIP2, new ExactKeetaScheme());
 app.use(paymentMiddleware({
   "GET /weather": {
     accepts: [
-      // A plain price is denominated in USDC; the Keeta token address is derived for you (main only: on test the
-      // package's USDC token doesn't exist, so use { asset: <resolver's $USDC>, amount } or KTA as below).
-      { scheme: "exact", price: "0.01", network: KEETA_TESTNET_CAIP2, payTo },
+      // 0.01 USDC as the resolver's $USDC (6 decimals on both networks; read decimalPlaces to confirm). A plain
+      // price: "0.01" works on main only: on test it names the package's USDC token, which doesn't exist.
+      { scheme: "exact", price: { asset: await getUsdcAddress(KEETA_TESTNET_CAIP2), amount: "10000" }, network: KEETA_TESTNET_CAIP2, payTo },
       // Or name any Keeta token and a raw base-unit amount.
       { scheme: "exact", price: { asset: KTA_TESTNET_ADDRESS, amount: "1000" }, network: KEETA_TESTNET_CAIP2, payTo },
     ],

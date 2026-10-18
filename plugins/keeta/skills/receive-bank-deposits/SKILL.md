@@ -29,6 +29,8 @@ Use whenever someone needs to **receive money by bank transfer into a Keeta acco
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 1. Use a Keeta account the user controls ([create-fund-wallet](../create-fund-wallet/SKILL.md)). Bivo and Bridge.xyz serve **verified individuals**, so the user needs a Keeta KYC certificate ([complete-kyc](../complete-kyc/SKILL.md)).
 2. Discover providers that take US bank deposits, and the Keeta token each one credits:
 
@@ -73,7 +75,10 @@ Use whenever someone needs to **receive money by bank transfer into a Keeta acco
      console.log(details.address, details.depositMessage, details.minimumTransferValue, details.fees);
    } catch (error) {
      if (Errors.KYCShareNeeded.isInstance(error)) { /* share error.neededAttributes with error.shareWithPrincipals, then retry */ }
-     else if (Errors.AdditionalKYCNeeded.isInstance(error)) { /* review pending (often under an hour) or account inactive: wait, then retry */ }
+     else if (Errors.AdditionalKYCNeeded.isInstance(error)) {
+       if (error.toCompleteFlow) console.log('The person must finish this step:', error.toCompleteFlow.url);   // then retry
+       /* otherwise review is pending (often under an hour): wait, then retry */
+     }
      else if (Errors.UserActionNeeded.isInstance(error)) {
        const builder = client.initBuilder();
        Errors.UserActionNeeded.addOperationsToBuilder(error.actionsNeeded, builder);   // explain, get approval, publish, then retry

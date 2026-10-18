@@ -14,7 +14,7 @@ Treat a copied endpoint, an old example or the static HTTP mirror as a hint only
 
 | Service type | Providers you may find | Skill |
 | --- | --- | --- |
-| `assetMovement` | Bivo: named US bank accounts, payouts in more than 60 countries, Visa Direct card rails. Bridge.xyz: USD and EUR bank transfers, other EVM chains. Keeta EVM anchor: Base. LayerZero: external chains, main network only. | [receive-bank-deposits](../receive-bank-deposits/SKILL.md), [pay-out](../pay-out/SKILL.md), [card-payments](../card-payments/SKILL.md), [bridge-crypto](../bridge-crypto/SKILL.md) |
+| `assetMovement` | Bivo: named US bank accounts, payouts in more than 60 countries, Visa Direct card rails. Bridge.xyz: USD and EUR bank transfers, other EVM chains. Keeta EVM anchor: Base (provider `keeta` on `chain:evm:8453` on main; `evm-anchor` on Base Sepolia `chain:evm:84532` on test). LayerZero: external chains, main network only. | [receive-bank-deposits](../receive-bank-deposits/SKILL.md), [pay-out](../pay-out/SKILL.md), [card-payments](../card-payments/SKILL.md), [bridge-crypto](../bridge-crypto/SKILL.md) |
 | `fx` | FX anchors with signed quotes, the stablecoin FX anchor (test network), price-estimate providers | [convert-via-anchors](../convert-via-anchors/SKILL.md) |
 | `kyc` | OneFootprint for individuals, Keeta's KYB provider for businesses (`entityType: 'business'`) | [complete-kyc](../complete-kyc/SKILL.md), [complete-kyb](../complete-kyb/SKILL.md) |
 | `username`, `storage`, `notification` | Keeta's own services | [anchors reference](../keeta/references/anchors.md) |
@@ -23,12 +23,14 @@ Which providers appear varies by account and network. Who may use each one (indi
 
 ## SDK steps
 
-1. Create a network-bound client. Every service client builds a resolver rooted at `client.networkAddress` by default:
+1. Create a network-bound client and one resolver that signs metadata requests with the account. The clients' built-in default resolver is unsigned, and misses providers that publish their routes only to signed requests:
 
    ```ts
    import * as KeetaAnchor from '@keetanetwork/anchor';
+   import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
 
    const client = KeetaAnchor.KeetaNet.UserClient.fromNetwork('test', account);   // or 'main', as confirmed
+   const resolver = new KeetaAnchor.lib.Resolver({ ...getDefaultResolverConfig(client), metadataConfig: { signing: { account } } });
    const fx = new KeetaAnchor.FX.Client(client, { resolver });
    const assetMovement = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const kyc = new KeetaAnchor.KYC.Client(client, { resolver });
@@ -38,20 +40,19 @@ Which providers appear varies by account and network. Who may use each one (indi
    - `assetMovement.getProvidersForTransfer({ asset, from, to })`, then `provider.isOperationSupported('initiateTransfer' | 'createPersistentForwarding')`
    - `fx.listPossibleConversions({ from })`, `fx.getQuotes(...)` and `fx.getEstimates(...)`
    - `kyc.getSupportedCountries('individual' | 'business')` and `kyc.createVerification(...)`
-   - `new KeetaAnchor.Username.Client(client, { resolver }).resolve(...)`, the storage client (deep import), and `new KeetaAnchor.Notification.Client(client, { resolver }).getProviders(...)`
-3. For generic discovery, or to inspect what a network offers, use the resolver directly:
+   - `new KeetaAnchor.Username.Client(client, { resolver }).resolve(...)` (no username provider is listed on test or main today, so it returns `null`), the storage client (deep import), and `new KeetaAnchor.Notification.Client(client, { resolver }).getProviders(...)`
+3. For generic discovery, or to inspect what a network offers, use the same resolver directly. Currency codes such as `'USD'` exist on main only; the test network's tickers are `$KTA`, `$USDC`, `$EURC`, `$CBBTC`, `$KUSD`, `$KEUR` and `$RUSD`, so read `listTokens()` first:
 
    ```ts
-   const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
    const tokens = await resolver.listTokens();                       // official token ↔ currency map
-   const fxProviders = await resolver.lookup('fx', { inputCurrencyCode: 'USD', outputCurrencyCode: '$KTA' });
-   const onRamps = await resolver.lookup('assetMovement', { asset: 'USD', from: 'bank-account:us', to: `chain:keeta:${client.network}` });
+   const fxProviders = await resolver.lookup('fx', { inputCurrencyCode: '$KTA', outputCurrencyCode: '$USDC' });
+   const onRamps = await resolver.lookup('assetMovement', { from: 'bank-account:us', to: `chain:keeta:${client.network}` });   // by location; read the token from the provider's paths
    const businessKYC = await resolver.lookup('kyc', { countryCodes: ['US'], entityType: 'business' });
    const plain = fxProviders ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(fxProviders) : null;
    ```
 
    - Service types are `fx`, `assetMovement`, `kyc`, `username`, `storage` and `notification`.
-   - Criteria take currency codes (`'USD'`, `'$KTA'`), token accounts, location strings (`'chain:evm:84532'`, `'bank-account:us'`) or typed objects.
+   - Criteria take currency codes (`'USD'`, `'$KTA'`), token accounts, location strings (`'chain:evm:8453'` for Base on main, `'chain:evm:84532'` for Base Sepolia on test, `'bank-account:us'`) or typed objects.
 4. Filter for the exact pair, locations, country, entity type, required operation and trusted operator. Present **every** qualifying provider with its ID, fees, limits and legal disclaimers (`provider.getLegalDisclaimers()` for asset movement). Never pick one by array order alone.
 5. Use <https://static.network.keeta.com/metadata/services> and `/metadata/currencyMap` only as a cache. If they disagree with the resolver, trust the resolver and report the difference.
 

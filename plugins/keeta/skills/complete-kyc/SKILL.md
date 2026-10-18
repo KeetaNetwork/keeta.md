@@ -21,6 +21,8 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 1. Confirm the environment, the account, the country, the provider's privacy terms, and the attributes the person is willing to disclose.
 2. Discover providers and start a verification:
 

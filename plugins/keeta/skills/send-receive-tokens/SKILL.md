@@ -18,6 +18,8 @@ Use for a direct on-chain transfer of a specific Keeta token, or to tell someone
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 1. **Receiving needs no on-chain action.** Sends land in the balance automatically. Share the address (`account.publicKeyString.get()`) with the network and the token you expect.
    - To pre-fill a payment, give the payer a `keeta://` request:
 

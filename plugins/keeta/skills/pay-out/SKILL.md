@@ -31,6 +31,8 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 1. Confirm the network, the source token and its balance (plus KTA for fees), the amount, the recipient's bank details and legal name, and the provider's terms.
 2. Discover providers for the exact corridor:
 
@@ -40,15 +42,29 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
 
    const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
-   const usdToken = await tokenFor('USD');                  // the Keeta token you pay from (keeta quickstart helper; main lists 'USD').
-   // Where the resolver has no 'USD' entry (test lists $KUSD instead), take the token from the provider's paths, as in receive-bank-deposits.
-   const asset = { from: usdToken, to: 'MXN' as const };   // → the recipient's currency
    const to = 'bank-account:clabe' as const;                // the recipient's bank location (table below)
-   const providers = await am.getProvidersForTransfer({ asset, from: keeta, to, rail: 'SPEI_PUSH' }) ?? [];
-   for (const p of providers) console.log(String(p.providerID), p.getLegalDisclaimers());
+   type Provider = NonNullable<Awaited<ReturnType<typeof am.getProvidersForTransfer>>>[number];
+
+   // The Keeta token each provider pays out from, read from its paths: test and main list different USD tokens.
+   function payoutTokens(provider: Provider): string[] {
+     const tokens = new Set<string>();
+     for (const { paths } of provider.serviceInfo.supportedAssets) {
+       for (const { pair: [a, b] } of paths) if (a.location === keeta && b.location === to) tokens.add(String(a.id));
+     }
+     return [...tokens];
+   }
+
+   // Search by location, so the provider's own token comes back on either network.
+   const providers = await am.getProvidersForTransfer({ from: keeta, to, rail: 'SPEI_PUSH' }) ?? [];
+   for (const p of providers) console.log(String(p.providerID), payoutTokens(p), p.getLegalDisclaimers());
    const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
-   if (!provider || !(await provider.isOperationSupported('initiateTransfer'))) throw new Error('no payout route for this corridor');
+   const tokenId = provider ? payoutTokens(provider)[0] : undefined;
+   if (!provider || !tokenId || !(await provider.isOperationSupported('initiateTransfer'))) throw new Error('no payout route for this corridor');
+   const usdToken = KeetaAnchor.KeetaNet.lib.Account.fromPublicKeyString(tokenId).assertKeyType(KeetaAnchor.KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
+   const asset = { from: usdToken, to: 'MXN' as const };   // → the recipient's currency
    ```
+
+   - Check the balance of `usdToken` itself: a USD token from another issuer is a different token.
 
    - Use only the locations and rails a provider advertises. Some currencies have several local rails, each at its own location.
    - **No provider for the token you hold?** Let `AnchorChaining` find a route that converts and pays out in one plan (below), or convert first with [convert-via-anchors](../convert-via-anchors/SKILL.md).
@@ -59,11 +75,14 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
      const readiness = await provider.getAccountStatus({ account });
      if (readiness.actionRequired) {
        for (const e of readiness.errors) {
-         if (Errors.KYCShareNeeded.isInstance(e)) { /* share e.neededAttributes with e.shareWithPrincipals (complete-kyc) */ }
+         if (Errors.KYCShareNeeded.isInstance(e)) { /* share e.neededAttributes with e.shareWithPrincipals (complete-kyc) */ continue; }
          if (Errors.UserActionNeeded.isInstance(e)) {
            const builder = client.initBuilder();
            Errors.UserActionNeeded.addOperationsToBuilder(e.actionsNeeded, builder);   // explain each action, then publish with approval
+           continue;
          }
+         if (Errors.AdditionalKYCNeeded.isInstance(e) && e.toCompleteFlow) throw new Error(`the person must finish ${e.toCompleteFlow.url}, then retry`);
+         throw e;                                                                         // anything else: stop and report it
        }
      }
    }
@@ -167,7 +186,7 @@ await chosen.execute({ requireSendAuth: true });   // run it once
 
 ### Recurring payouts
 
-- **Save a recipient.** Call `provider.createPersistentForwardingTemplate({ account, asset, location, address: recipient })`, then pay with `recipient: { type: 'persistent-address-template', persistentAddressTemplateId }`.
+- **Save a recipient.** `const { id } = await provider.createPersistentForwardingTemplate({ account, asset, location, address: recipient })` returns the template ID (stop if `id` is missing). Store it, then pay with `recipient: { type: 'persistent-address-template', persistentAddressTemplateId: id }`.
 - **Standing payout address.** `provider.createPersistentForwardingAddress({ account, sourceLocation: keeta, destinationLocation: to, destinationAddress: recipient, asset })` returns an address that pays the recipient every time it is funded.
   - A `keeta://` URI means: parse it with `KeetaAnchor.lib.URI.parseKeetaURI`, then send to its `to` address, in its `token` (or your source token, when the URI names none), with `external[0]`.
   - A plain Keeta address means: send to it directly.

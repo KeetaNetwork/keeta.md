@@ -19,6 +19,8 @@ The Swift, Rust and C# SDKs don't support `entityType` yet.
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 1. Confirm that the verification is for an entity, and who is authorized to act for it. Collect only the routing facts discovery needs:
    - the environment
    - the country of incorporation (one ISO country code)
@@ -33,7 +35,9 @@ The Swift, Rust and C# SDKs don't support `entityType` yet.
    const countries = await kyc.getSupportedCountries('business');
    if (countries.length === 0) throw new Error('no KYB provider on this network');
 
-   const providers = await kyc.createVerification({ countryCodes: ['US'], account, entityType: 'business' });
+   const countryOfIncorporation = 'US';                                   // the code the user gave in step 1
+   if (!countries.some((country) => country.code === countryOfIncorporation)) throw new Error(`no KYB provider for ${countryOfIncorporation}`);
+   const providers = await kyc.createVerification({ countryCodes: [countryOfIncorporation], account, entityType: 'business' });
    for (const provider of providers) {
      console.log(provider.id, (await provider.countryCodes())?.map((country) => country.code));
    }
@@ -42,11 +46,14 @@ The Swift, Rust and C# SDKs don't support `entityType` yet.
 3. Present every provider with its terms. After the user approves one, call `provider.startVerification()` and give `verification.webURL` to the **authorized person**.
    - That person enters the business data, beneficial owners and documents in the provider's hosted page. The agent never does this for them.
    - Treat the link as a bearer secret.
+   - `verification.expectedCost` is `{ min, max, token }` in base units of that token, when the provider charges. Show it with the token's decimals and get approval before the person starts.
    - Persist `verification.providerID`, `verification.id`, the country and the entity type, so you can resume later with `kyc.getVerificationStatus(providerID, { id, account, countryCodes, entityType: 'business' })`.
-4. Poll `verification.getVerificationStatus()` with a long backoff:
-   - Manual review (`requiresManualVerification`) can take days.
-   - `fail` is final, so don't loop on it.
-5. When the status is `pass`, call `verification.getCertificates()` and honor `retryAfter`. Inspect the issuer and validity, then attach the certificate with consent, using the same `modifyCertificate(ADD, cert, bundle)` call as [complete-kyc](../complete-kyc/SKILL.md).
+   - If the person lost the link or it expired, `kyc.getVerificationURL(providerID, { id, account, countryCodes, entityType: 'business' })` returns a fresh one; `null` means this provider can't reissue it, so start a new verification.
+4. Poll `(await verification.getVerificationStatus()).status` with a long backoff. It is `pass`, `fail`, `pending`, `incomplete` or `error`:
+   - `pending`: review is running. Manual review (`requiresManualVerification`) can take days.
+   - `incomplete`: the authorized person hasn't finished the hosted page. Remind them, with a fresh link if needed.
+   - `fail` is final, so don't loop on it. `error` means the provider couldn't process it: report it and don't retry blindly.
+5. When the status is `pass`, call `verification.getCertificates()` and honor `retryAfter`. A provider can answer with `Errors.PaymentRequired` (import `Errors` from `@keetanetwork/anchor/services/kyc/common.js`), which carries `amount` (base units) and `token`: show the cost and get approval, never pay it automatically. Inspect the issuer and validity, then attach the certificate with consent, using the same `modifyCertificate(ADD, cert, bundle)` call as [complete-kyc](../complete-kyc/SKILL.md).
 6. When an asset-movement provider raises `KYCShareNeeded` for organization attributes, share exactly the requested ones. Examples include `organizationName`, `tradeName`, `legalForm`, `incorporation`, `documentBusinessRegistration`, `address` and `website`. The code is in the [identity reference](../keeta/references/identity.md).
 7. Confirm readiness with the anchor's `getAccountStatus(...)` before any payout.
 

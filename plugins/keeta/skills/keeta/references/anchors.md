@@ -22,7 +22,7 @@ Anchors are off-chain services that connect Keeta to the outside world. They pub
 | **Keeta EVM anchor** | asset movement | Keeta's own bridge with Base for KTA, USDC, EURC and cbBTC, with no bridge fee | main (Base), test (Base Sepolia) | None |
 | **LayerZero** (Virtual Transfer anchor) | asset movement | Bridges and swaps about 50 tokens across 10 EVM chains, with Solana as a destination. It never touches Keeta, so routes chain it with the Keeta EVM anchor through Base. | main | None |
 | **OneFootprint** | KYC | Hosted identity verification that issues a reusable Keeta KYC certificate | main, test | — |
-| **Keeta KYB provider** | KYC (`entityType: 'business'`) | Business verification for companies incorporated in about 30 countries | where listed | — |
+| **Keeta KYB provider** | KYC (`entityType: 'business'`) | Business verification for companies incorporated in 33 countries | where listed | — |
 | **Stablecoin FX anchor** | FX | 1:1 conversions between stablecoins of the same currency | test | None |
 
 Who may use each provider (individuals or businesses, and regional limits) is in "Match services to your principal" in [SKILL.md](../SKILL.md).
@@ -34,9 +34,9 @@ Workflows: [receive-bank-deposits](../../receive-bank-deposits/SKILL.md), [pay-o
 ```ts
 const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
 const tokens = await resolver.listTokens();                 // [{ token: 'keeta_…', currency: 'USD' | '$KTA' | … }]
-const usd = await resolver.lookupToken('USD');              // { token, currency } | null
+const usd = await resolver.lookupToken('USD');              // { token, currency } | null; main only, test uses '$KUSD'
 const kycCountries = await resolver.listSupportedKYCCountries('individual');
-const fx = await resolver.lookup('fx', { inputCurrencyCode: 'USD', outputCurrencyCode: '$KTA' });
+const fx = await resolver.lookup('fx', { inputCurrencyCode: '$KTA', outputCurrencyCode: '$USDC' });
 const plain = fx ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(fx) : null; // inspect as JSON
 ```
 
@@ -60,7 +60,7 @@ const plain = fx ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizabl
 
 **Locations:**
 - the Keeta chain: `{ type: 'chain', chain: { type: 'keeta', networkId: client.network } }` or `` `chain:keeta:${client.network}` ``
-- an EVM chain: `'chain:evm:8453'`; Solana: `'chain:solana:<genesis hash>'`
+- an EVM chain: `'chain:evm:8453'` (Base, main) or `'chain:evm:84532'` (Base Sepolia, test); Solana: `'chain:solana:<genesis hash>'`
 - a bank account: `'bank-account:us'`, `'bank-account:iban-swift'`, `'bank-account:clabe'`, `'bank-account:pix'` and one location per country scheme; a debit card: `'bank-account:card'`
 
 **Assets:** a Keeta token, a currency code such as `'USD'`, or an external asset written `'evm:0x…'` or `'solana:<mint>'`. Pairs are written `{ from, to }`. Discovery matches the asset IDs a provider publishes, so you can also search by location alone and read the Keeta token from the provider's paths (`provider.serviceInfo.supportedAssets`).
@@ -123,6 +123,8 @@ if (plan) {
 Use the [complete-kyc](../../complete-kyc/SKILL.md) skill for a person and [complete-kyb](../../complete-kyb/SKILL.md) for a business. Both run through `KYC.Client.createVerification({ countryCodes, account, entityType })`, then `startVerification()`, which returns a `webURL` that a **human** completes. Poll `getVerificationStatus()`, then call `getCertificates()` and attach the result with `modifyCertificate`. Business providers appear only when `entityType: 'business'` is passed.
 
 ## Usernames
+
+No username provider is listed on test or main today (CI checks this daily), so `resolve` and `resolveMulti` return `null`. Ask for the `keeta_…` address instead. The calls below are ready for when one is listed:
 
 ```ts
 const usernames = new KeetaAnchor.Username.Client(client, { resolver });

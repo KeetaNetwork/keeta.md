@@ -18,10 +18,15 @@ Use before any agent can propose or execute value movement: sends, conversions, 
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`.
+
 1. **Bound the blast radius on-chain.** Give the agent its own account, or a storage vault, and fund it with only the current budget. Refill it on a schedule. The ledger then caps losses at that balance, even if the agent misbehaves.
 
    ```ts
+   import * as KeetaNet from '@keetanetwork/keetanet-client';
+
    const { Account, Permissions, Block } = KeetaNet.lib;
+   const usdc = await tokenFor('$USDC');   // keeta quickstart helper: the network's own USDC
    const { account: vault } = await client.generateIdentifier(Account.AccountKeyAlgorithm.STORAGE); // owner: the human's client
    const setup = client.initBuilder();
    setup.setInfo({ name: 'AGENT_BUDGET', description: 'Agent spending pot', metadata: '',
@@ -44,7 +49,7 @@ Use before any agent can propose or execute value movement: sends, conversions, 
    - an expiry and an emergency stop.
 4. **Normalize before every SDK call.** Read fresh balances. Reduce the proposed action to network, method, token, base-unit amount, recipient or provider, and external reference. Evaluate every rule. A missing field, a stale policy, unknown token decimals or an unreachable policy store is a **denial**.
 5. **Ask for approval when the policy requires it.** Show the full normalized action and the policy result. Then call exactly that method: `client.send(...)`, `approvedQuote.createExchange()`, `provider.initiateTransfer(...)`, or the instruction's funding send.
-6. **For x402, also set the library's controls:** `x402Client.setSpendControls({ maxAmountPerPayment, allowedAssets })` plus an `onBeforePaymentCreation` hook that calls this policy ([x402-payments](../x402-payments/SKILL.md)).
+6. **For x402, the boundary is a dedicated key-pair account,** funded with only the budget. The x402 signer (`toClientKeetaSigner(account)`) pays from that account's own balance and can't spend from a vault through `SEND_ON_BEHALF`. **Also set the library's controls:** `x402Client.setSpendControls({ maxAmountPerPayment, allowedAssets })` plus an `onBeforePaymentCreation` hook that calls this policy ([x402-payments](../x402-payments/SKILL.md)).
 7. **Record a redacted audit entry:** policy version, approval reference, request hash, SDK result (block hashes or anchor transfer ID) and final status.
 
 ## Confirmations
