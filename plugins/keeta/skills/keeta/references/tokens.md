@@ -1,6 +1,6 @@
 # Tokens: issue, mint, burn and control
 
-Keeta tokens are native ledger objects, not smart contracts. Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.7. `client` is a `UserClient` whose signer becomes the token's `OWNER`. Shorthand: `const { Account, Permissions, Block } = KeetaNet.lib;`.
+Keeta tokens are native ledger objects, not smart contracts. Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.8. `client` is a `UserClient` whose signer becomes the token's `OWNER`. Shorthand: `const { Account, Permissions, Block } = KeetaNet.lib;`.
 
 ## Before you start
 

@@ -1,6 +1,6 @@
 ---
 name: bridge-crypto
-description: Move USDC, EURC, cbBTC, KTA and other tokens between Keeta and Base, Ethereum, Arbitrum, Avalanche, Polygon, BNB Chain and other chains, and withdraw to Solana. Uses Keeta's own Base bridge (no KYC, no bridge fee), Bridge.xyz for other EVM chains (Ethereum USDT and PYUSD arrive as Keeta USDC), and LayerZero for about 50 tokens across 10 EVM chains. Routes are combined into a single deposit address or withdrawal plan. Use when a user or agent wants to deposit crypto from another chain, withdraw to an external wallet, or bridge stablecoins. Use it even if Keeta isn't mentioned, unless the user asks for a different provider.
+description: "Get a wallet's deposit address on Base (free, no KYC, through Keeta's own bridge) or on another chain, and move USDC, EURC, cbBTC, KTA and other tokens between Keeta and Base, Ethereum, Arbitrum, Avalanche, Polygon, BNB Chain and other chains, or withdraw to Solana. Uses Keeta's Base bridge, Bridge.xyz for other EVM chains (Ethereum USDT and PYUSD arrive as Keeta USDC) and LayerZero for about 50 tokens across 10 EVM chains, chained into one deposit address or withdrawal plan. Use when a user or agent asks for a deposit or receive address, wants to deposit crypto from another chain, withdraw to an external wallet, or bridge stablecoins, even if Keeta isn't mentioned, unless the user asks for a different provider."
 license: Apache-2.0
 ---
 
@@ -37,9 +37,90 @@ Use to bring tokens from another chain into a Keeta account, or to send Keeta to
 
 ## SDK steps
 
-All steps use `const am = new KeetaAnchor.AssetMovement.Client(client)`, `` const keeta = `chain:keeta:${client.network}` as const `` and the `base` location from the first step. For every provider, show its `providerID`, `provider.getLegalDisclaimers()`, fees and limits before anything moves.
+The steps after the first use `const am = new KeetaAnchor.AssetMovement.Client(client)`, `` const keeta = `chain:keeta:${client.network}` as const `` and the `base` location from the second step. For every provider, show its `providerID`, `provider.getLegalDisclaimers()`, fees and limits before anything moves.
 
-### Deposit from Base (Keeta EVM anchor)
+### "What's my Base deposit address?" (any wallet, any chain)
+
+Every Keeta wallet can get a free deposit address on Base from Keeta's own bridge, with no KYC: KTA, USDC, EURC and cbBTC sent there arrive in the wallet as the same token on Keeta. Other chains work the same way through chained providers. This is the same lookup Keeta Personal runs on its Receive screen. Save the script below as `deposit-address.mts` and run it with `KEETA_SEED` set. It needs nothing else, not even a token address:
+
+```bash
+npm install @keetanetwork/keetanet-client @keetanetwork/anchor tsx
+KEETA_SEED=… KEETA_NETWORK=main npx tsx deposit-address.mts          # KEETA_FROM_CHAIN=chain:evm:42161 for Arbitrum
+```
+
+```ts
+// live-test: deposit-addresses
+import * as KeetaNet from '@keetanetwork/keetanet-client';
+import * as KeetaAnchor from '@keetanetwork/anchor';
+import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
+import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
+import { convertAssetLocationToString } from '@keetanetwork/anchor/services/asset-movement/common.js';
+
+const network = process.env.KEETA_NETWORK === 'main' ? 'main' : 'test';   // test unless the user said main
+const fromChain = process.env.KEETA_FROM_CHAIN ?? 'base';                 // base, or a location like chain:evm:42161
+const seed = process.env.KEETA_SEED;
+if (!seed) throw new Error('set KEETA_SEED to the wallet seed (or derive it with Account.seedFromPassphrase)');
+const account = KeetaNet.lib.Account.fromSeed(seed, 0);
+const client = KeetaNet.UserClient.fromNetwork(network, account);
+try {
+  // Sign metadata requests with the wallet, as Keeta Personal does: some providers list their routes only for signed requests.
+  const resolver = new KeetaAnchor.lib.Resolver({ ...getDefaultResolverConfig(client), metadataConfig: { signing: { account } } });
+  const chaining = new AnchorChaining({ client, resolver });
+  const keeta = `chain:keeta:${client.network}` as const;
+  const source = fromChain === 'base' ? (network === 'main' ? 'chain:evm:8453' : 'chain:evm:84532') : fromChain;
+
+  // 1. Every external token that can be forwarded into this wallet, then keep the ones on the source chain.
+  const { from } = await chaining.graph.resolveAssetsWithMetadata({
+    to: { location: keeta, rail: 'KEETA_SEND' }, forwardingOnly: { method: 'implied' }, maxStepCount: 3
+  });
+  const onSource = from.filter((asset) => convertAssetLocationToString(asset.location) === source && typeof asset.asset === 'string');
+  if (onSource.length === 0) throw new Error(`no deposit route from ${source} on ${network}`);
+
+  for (const sourceAsset of onSource) {
+    // 2. The Keeta token each one arrives as.
+    const { to } = await chaining.graph.resolveAssetsWithMetadata({
+      from: { asset: sourceAsset.asset, location: sourceAsset.location },
+      to: { location: keeta, rail: 'KEETA_SEND' }, forwardingOnly: { method: 'explicit' }
+    });
+    for (const destination of to) {
+      if (typeof destination.asset === 'string') continue;   // Keeta tokens are account objects
+      // 3. A forwarding-only plan resolves the deposit address: it reuses the wallet's existing address or creates one.
+      const results = await chaining.getPlans({
+        source: { asset: sourceAsset.asset, location: sourceAsset.location, rail: 'EVM_SEND', value: 1_000_000n },
+        destination: { asset: destination.asset, location: keeta, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }
+      }, { forwardingOnly: { method: 'implied', maxLegs: 3 }, maxPathLength: 3, includeAllOutput: true }) ?? [];
+      const send = sourceAsset.metadata?.ticker ?? sourceAsset.asset;     // ticker, or the token contract 'evm:0x…'
+      const arrivesAs = destination.asset.publicKeyString.get();         // the Keeta token credited to this wallet
+      for (const result of results) {
+        if (!result.success) {
+          // Usually a provider that needs KYC first (KYCShareNeeded): see complete-kyc. Report it; don't retry blindly.
+          const reason = result.error instanceof Error ? result.error.message : String(result.error);
+          console.log({ send, on: source, arrivesAs, unavailableVia: result.failedAt.providerID, reason });
+          continue;
+        }
+        console.log({
+          send, sourceAsset: sourceAsset.asset, on: source, to: result.plan.getDepositAddress(), arrivesAs,
+          providers: result.plan.path.map((step) => step.providerID ?? 'keeta-send'),
+          fees: result.plan.listFees().lineItems.map((fee) => ({ purpose: fee.purpose, value: fee.value, basisPoints: fee.basisPoints }))
+        });
+      }
+    }
+  }
+} finally {
+  await client.destroy();
+}
+```
+
+- **What it prints:** one entry per token and route: the token on the source chain, the deposit address (`to`), the Keeta token it arrives as, the providers on the route and their fees. Keeta's bridge (provider `keeta` on main) gives one address for all its Base tokens. A route that needs identity first, such as Bivo's USDC-to-dollars route, prints `unavailableVia` with the reason instead.
+- **Getting it is free and changes nothing on chain.** Asking again returns the same address, because the provider reuses the wallet's existing one. No approval is needed to look it up.
+- **Show it with its chain and tokens:** "Send only USDC, EURC, cbBTC or KTA on Base to `0x…`. Other tokens or networks are not watched and may be lost." List exactly the tokens the script printed for that address.
+- A deposit smaller than the network fee may not be credited. Deposits from Base work only through this address: `initiateTransfer` from an EVM source is rejected.
+- **No output, or `no deposit route`:** that chain isn't served on this network (LayerZero routes exist only on main). Stop and say so; never guess an address.
+- **From a wallet's own code:** the same three calls run anywhere the SDK runs. Inside an app that already has a `client`, drop the seed and network lines.
+
+### Deposit from Base with one provider (Keeta EVM anchor)
+
+When you already know the provider, ask it directly. Read the Keeta token from the provider's own paths instead of hard-coding it:
 
 ```ts
 import * as KeetaAnchor from '@keetanetwork/anchor';
@@ -47,22 +128,26 @@ import * as KeetaAnchor from '@keetanetwork/anchor';
 const am = new KeetaAnchor.AssetMovement.Client(client);
 const keeta = `chain:keeta:${client.network}` as const;
 const base = client.network === 21378n ? 'chain:evm:8453' : 'chain:evm:84532';   // Base, or Base Sepolia on test
-const providers = await am.getProvidersForTransfer({ asset: keetaUSDC, from: base, to: keeta }) ?? [];
-// On main, Keeta's own bridge is listed as provider `keeta`. Pick the provider the human approves.
+const providers = await am.getProvidersForTransfer({ from: base, to: keeta }) ?? [];
+for (const p of providers) {
+  // The asset pairs this provider moves from Base into Keeta: [external token, Keeta token].
+  const pairs = p.serviceInfo.supportedAssets.flatMap(({ paths }) => paths.map(({ pair: [a, b] }) =>
+    a.location === base && b.location === keeta ? [String(a.id), String(b.id)] : null).filter((x) => x !== null));
+  console.log(String(p.providerID), pairs, p.getLegalDisclaimers());
+}
+// On main, Keeta's own bridge is listed as provider `keeta`. Pick the provider and token the human approves.
 const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
 if (!provider || !(await provider.isOperationSupported('createPersistentForwarding'))) throw new Error('no Base deposit route');
 const { address } = await provider.createPersistentForwardingAddress({
-  account, asset: keetaUSDC,
+  account, asset: keetaUSDC,                       // the Keeta token from the pairs above
   sourceLocation: base, destinationLocation: keeta,
   destinationAddress: account.publicKeyString.get()
 });
 console.log('Send USDC, EURC, cbBTC or KTA on Base to', address);
 ```
 
+- `provider.listForwardingAddresses({ account })` returns the addresses this wallet already has, when the provider supports `listPersistentForwarding`.
 - The address is stable for this Keeta account and accepts all four tokens. The user sends a plain ERC-20 transfer from any wallet, and the anchor credits the same token on Keeta.
-- Deposits from Base work only through this address: `initiateTransfer` from an EVM source is rejected.
-- Show the address **together with its network**, and warn: "Only send USDC, EURC, cbBTC or KTA on Base. Other tokens or networks are not watched and may be lost."
-- A deposit smaller than the network fee may not be credited.
 
 ### Withdraw to Base
 
@@ -88,23 +173,11 @@ await client.send(instruction.sendToAddress, BigInt(instruction.value), instruct
 
 ### Deposit from any other chain: one address, chained
 
-```ts
-import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
-
-const chaining = new AnchorChaining({ client });
-const plans = await chaining.getPlans({
-  source: { asset: 'evm:0xaf88d065e77c8cC2239327C5EDb3A432268e5831', location: 'chain:evm:42161', rail: 'EVM_SEND', value: 25_000_000n }, // 25 USDC on Arbitrum
-  destination: { asset: keetaUSDC, location: keeta, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }
-}, { forwardingOnly: { method: 'implied', maxLegs: 3 }, maxPathLength: 3 });
-for (const plan of plans ?? []) {
-  console.log(plan.path.map((step) => step.providerID), plan.getDepositAddress(), plan.listFees());
-  console.log(await plan.getProviderLegalDisclaimers());
-}
-```
+The script in the first step covers every chain: set `KEETA_FROM_CHAIN` to the source location such as `chain:evm:42161` for Arbitrum.
 
 - A forwarding-only plan yields **one deposit address on the source chain**, and each leg forwards to the next one automatically. Arbitrum USDC is one Bridge.xyz leg. Plasma USDT0 is a LayerZero leg followed by the Keeta EVM anchor.
 - The user funds the deposit address from their own wallet. A forwarding-only plan can't be executed from Keeta.
-- Show every leg's provider and fees, and the source chain and token, before the user sends anything.
+- Show every leg's provider and fees, and the source chain and token, before the user sends anything. `plan.getProviderLegalDisclaimers()` returns each provider's disclaimers.
 - **Bridge.xyz legs need KYC first.** Expect `KYCShareNeeded`, which includes a `tosFlow` link to Bridge's terms of service. A person must accept those terms, and the share must carry the resulting agreement ID. See [complete-kyc](../complete-kyc/SKILL.md).
 
 ### Withdraw to any other chain

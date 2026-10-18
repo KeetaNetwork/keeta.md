@@ -149,6 +149,21 @@ def check_stray_skill_files(errors: list[str]) -> None:
                 fail(f"{relative}: SKILL.md files belong only in plugins/keeta/skills/<name>/", errors)
 
 
+def check_sdk_versions(errors: list[str]) -> None:
+    """README.md names the SDK versions the code blocks are checked against; they must be the pinned ones."""
+    package = ROOT / "tests" / "snippets" / "package.json"
+    if not package.is_file():
+        fail("tests/snippets/package.json: missing", errors)
+        return
+    pinned = json.loads(package.read_text(encoding="utf-8"))["dependencies"]
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    for name in ("@keetanetwork/keetanet-client", "@keetanetwork/anchor", "@x402/keeta"):
+        version = pinned.get(name)
+        label = "@x402/*" if name.startswith("@x402/") else name
+        if not version or f"`{label}` {version}" not in readme:
+            fail(f"README.md: the accuracy policy must name `{label}` {version}, the version in tests/snippets/package.json", errors)
+
+
 def main() -> int:
     errors: list[str] = []
     skill_files = sorted(SKILLS_ROOT.glob("*/SKILL.md"))
@@ -164,6 +179,7 @@ def main() -> int:
 
     check_manifests(errors)
     check_stray_skill_files(errors)
+    check_sdk_versions(errors)
 
     for path in skill_files:
         relative = path.relative_to(ROOT)

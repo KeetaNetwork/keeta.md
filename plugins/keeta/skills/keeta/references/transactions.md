@@ -1,6 +1,6 @@
 # Transactions: sending, batching, fees, swaps and history
 
-Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.7. `client` is a `KeetaNet.UserClient` with a signer.
+Every code block here typechecks against `@keetanetwork/keetanet-client` 0.18.8. `client` is a `KeetaNet.UserClient` with a signer.
 
 ## Send
 

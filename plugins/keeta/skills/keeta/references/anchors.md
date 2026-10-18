@@ -1,6 +1,6 @@
 # Anchors: discovery and every service client
 
-Anchors are off-chain services that connect Keeta to the outside world. They publish signed metadata that clients discover through the **resolver**, which is rooted at the network account by default. Every code block here typechecks against `@keetanetwork/anchor` 0.0.100 (`import * as KeetaAnchor from '@keetanetwork/anchor'`). `KeetaAnchor.KeetaNet` re-exports the client SDK.
+Anchors are off-chain services that connect Keeta to the outside world. They publish signed metadata that clients discover through the **resolver**, which is rooted at the network account by default. Every code block here typechecks against `@keetanetwork/anchor` 0.0.104 (`import * as KeetaAnchor from '@keetanetwork/anchor'`). `KeetaAnchor.KeetaNet` re-exports the client SDK.
 
 | Service | Client | What it does |
 | --- | --- | --- |

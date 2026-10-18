@@ -16,7 +16,7 @@ Use [send-receive-tokens](../send-receive-tokens/SKILL.md) for wallet-to-wallet 
 
 ## SDK steps
 
-Install the client SDK and the x402 packages (verified with `@x402/*` 2.28.0 and `@keetanetwork/keetanet-client` 0.18.7):
+Install the client SDK and the x402 packages (verified with `@x402/*` 2.28.0 and `@keetanetwork/keetanet-client` 0.18.8):
 
 ```bash
 npm install @keetanetwork/keetanet-client @x402/core @x402/keeta @x402/fetch @x402/express

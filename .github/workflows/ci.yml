@@ -45,3 +45,37 @@ jobs:
           for skill in $(python3 -c "import json; print(' '.join(s['name'] for s in json.load(open('_site/.well-known/agent-skills/index.json'))['skills']))"); do
             grep -q "$skill" skills-list.txt || { echo "skills CLI did not list $skill"; exit 1; }
           done
+
+  typecheck:
+    name: Typecheck every code block
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/snippets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tests/snippets/package-lock.json
+      - run: npm ci
+      - name: Typecheck the TypeScript blocks against the published SDKs
+        run: npm run typecheck
+
+  live:
+    name: Run the live blocks on the test network
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/snippets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tests/snippets/package-lock.json
+      - run: npm ci
+      - name: Run each live-test block with a new test-network wallet
+        run: npm run live
