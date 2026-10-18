@@ -12,14 +12,15 @@ Use whenever someone needs to **receive money by bank transfer into a Keeta acco
 
 | Option | Provider | What the user gets | Lands as |
 | --- | --- | --- | --- |
-| **Named US account (ACH)** | Bivo | A checking **account number and routing number in the user's own legal name**. Anyone can pay it by ACH, including an employer's payroll. | Bivo's Keeta USD token, less fees |
-| **Wire, or RTP where offered** | Bivo | Domestic wire or real-time payment (RTP) instructions with a reference memo | Keeta USD |
-| **International wire (SWIFT)** | Bivo | IBAN or account number, BIC and bank details with a memo. Available in USD and the other currencies Bivo issues on Keeta, such as EUR, GBP, CAD, MXN, JPY, AED, HKD and CNY. | That currency's Bivo token |
+| **Named US account (ACH)** | Bivo | A checking **account number and routing number in the user's own legal name**. Anyone can pay it by ACH, including an employer's payroll. | Bivo's Keeta USD token (USD on main, moving to `$KBUSD`), less fees |
+| **Wire, or RTP where offered** | Bivo | Domestic wire or real-time payment (RTP) instructions with a reference memo | Bivo's Keeta USD token |
+| **International wire (SWIFT)** | Bivo | IBAN or account number, BIC and bank details with a memo. Available in USD and the other currencies Bivo issues on Keeta, such as EUR, GBP, CAD, MXN, JPY, AED, HKD and CNY. | That currency's Bivo token (such as EUR, moving to `$KBEUR`) |
 | **One-time ACH or wire into USDC** | Bridge.xyz | Deposit instructions with a reference, for one transfer | Keeta USDC |
 
 - **Bivo Inc. (NMLS #2572288)** is a licensed money transmitter. It provides payment accounts and international payments on Keeta. Identity verification is by OneFootprint, through a Keeta KYC certificate.
 - **No advance notice:** deposits to the named account don't need to be announced. Confirm each one with `listTransactions` or the balance.
-- **Bivo has two listings.** The original listing (main and test) issues tokens named by currency code: USD, EUR, GBP, CAD, AED, HKD, JPY, MXN and CNY. The newer listing (open on test, rolling out on main) issues `$K` tokens such as `$KUSD` and `$KEUR`. It adds RTP deposits and card payouts on US accounts, and takes stablecoin deposits through persistent addresses. Each listing works only with its own tokens, so take the token from the listing's paths.
+- **Bivo's Keeta tokens are changing.** On main, Bivo's listing pays from and credits tokens named by currency code: USD, EUR, GBP, CAD, AED, HKD, JPY, MXN and CNY. Bivo is moving them to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`, `$KBGBP`, `$KBCAD`, `$KBMXN`, `$KBJPY` and `$KBAED`, which main's token list already carries. Bivo's newer listing (on test today) uses its own test token, which the token list doesn't name; it adds RTP deposits and card payouts on US accounts, and takes stablecoin deposits through persistent addresses.
+- **Take Bivo's token from its paths on every run,** never from a ticker. USD, `$KBUSD` and `$KUSD` are three different tokens: `$KUSD` is Keeta's abstract dollar token, which the stablecoin FX anchor converts 1:1 with `$KBUSD` ([convert-via-anchors](../convert-via-anchors/SKILL.md)). A provider accepts only the tokens its paths list, so convert first when the user holds a different one.
 - **Who can use it:** individuals with KYC. Bivo's newer listing doesn't onboard residents of the EU or Texas. Bridge.xyz needs a US SSN or a national tax ID from a supported country; tax IDs from the UK, Spain, Switzerland, Singapore, Argentina, Colombia and Uruguay aren't supported. These bank features don't serve businesses yet. See "Match services to your principal" in the [keeta](../keeta/SKILL.md) skill.
 - **Other ways in:**
   - stablecoins from another chain: [bridge-crypto](../bridge-crypto/SKILL.md)
