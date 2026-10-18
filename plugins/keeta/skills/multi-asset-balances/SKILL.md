@@ -27,7 +27,7 @@ Use when an agent must list an account's assets, check one token before a transf
    import * as KeetaAnchor from '@keetanetwork/anchor';
    import type { TokenAddress } from '@keetanetwork/keetanet-client/lib/account.js';
 
-   const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [] });
+   const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
    const official = new Map((await resolver.listTokens()).map(({ token, currency }) => [token, currency]));
 
    async function describe(token: TokenAddress) {

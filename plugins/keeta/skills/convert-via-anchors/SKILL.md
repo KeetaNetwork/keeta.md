@@ -31,7 +31,7 @@ Use for an on-chain conversion once the exact source and destination assets are 
    import * as KeetaAnchor from '@keetanetwork/anchor';
    import { Errors as FXErrors } from '@keetanetwork/anchor/services/fx/common.js';
 
-   const fx = new KeetaAnchor.FX.Client(client);                       // resolver root: the network account
+   const fx = new KeetaAnchor.FX.Client(client, { resolver });                       // resolver root: the network account
    const pairs = await fx.listPossibleConversions({ from: client.baseToken });
    const quotes = await fx.getQuotes({ from: client.baseToken, to: 'USD', amount, affinity: 'from' });
    if (!quotes || quotes.length === 0) throw new Error('no FX provider for this pair');
@@ -69,7 +69,7 @@ Use for an on-chain conversion once the exact source and destination assets are 
    ```ts
    import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
 
-   const chaining = new AnchorChaining({ client });
+   const chaining = new AnchorChaining({ client, resolver });
    const keetaChain = `chain:keeta:${client.network}` as const;
    const plans = await chaining.getPlans({
      source: { asset: keetaUSD, location: keetaChain, rail: 'KEETA_SEND', value: amount },

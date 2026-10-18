@@ -38,7 +38,7 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
    import * as KeetaAnchor from '@keetanetwork/anchor';
    import { Errors, type RecipientResolved } from '@keetanetwork/anchor/services/asset-movement/common.js';
 
-   const am = new KeetaAnchor.AssetMovement.Client(client);
+   const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
    const asset = { from: usdToken, to: 'MXN' as const };   // the Keeta token you pay from → the recipient's currency
    const to = 'bank-account:clabe' as const;                // the recipient's bank location (table below)
@@ -94,6 +94,7 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
    const instruction = transfer.instructions.find((i) => i.type === 'KEETA_SEND');
    if (!instruction || instruction.type !== 'KEETA_SEND') throw new Error('no KEETA_SEND instruction');
    // Show sendToAddress, tokenAddress, value, assetFee and totalReceiveAmount; get approval; then:
+   if (instruction.external === undefined) throw new Error('no external reference: run this payout through AnchorChaining instead');
    await client.send(instruction.sendToAddress, BigInt(instruction.value), instruction.tokenAddress, instruction.external);
    ```
 
@@ -142,7 +143,7 @@ Local rails also reach Hong Kong, Singapore, Malaysia, Australia, Japan, China, 
 ```ts
 import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
 
-const chaining = new AnchorChaining({ client });
+const chaining = new AnchorChaining({ client, resolver });
 const plans = await chaining.getPlans({
   source: { asset: keetaUSDC, location: keeta, rail: 'KEETA_SEND', value: amount },
   destination: { asset: 'MXN', location: to, rail: 'SPEI_PUSH', recipient }

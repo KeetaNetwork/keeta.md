@@ -33,6 +33,7 @@ declare global {
 
 	// The connected client and its account.
 	const client: UserClient;
+	const resolver: InstanceType<typeof KeetaAnchorModule.lib.Resolver>;
 	const account: Account;
 	const me: Account;
 	const keeta: `chain:keeta:${bigint}`;

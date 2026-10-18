@@ -37,7 +37,7 @@ Use to bring tokens from another chain into a Keeta account, or to send Keeta to
 
 ## SDK steps
 
-The steps after the first use `const am = new KeetaAnchor.AssetMovement.Client(client)`, `` const keeta = `chain:keeta:${client.network}` as const `` and the `base` location from the second step. For every provider, show its `providerID`, `provider.getLegalDisclaimers()`, fees and limits before anything moves.
+The steps after the first use `const am = new KeetaAnchor.AssetMovement.Client(client, { resolver })`, `` const keeta = `chain:keeta:${client.network}` as const `` and the `base` location from the second step. For every provider, show its `providerID`, `provider.getLegalDisclaimers()`, fees and limits before anything moves.
 
 ### "What's my Base deposit address?" (any wallet, any chain)
 
@@ -125,7 +125,7 @@ When you already know the provider, ask it directly. Read the Keeta token from t
 ```ts
 import * as KeetaAnchor from '@keetanetwork/anchor';
 
-const am = new KeetaAnchor.AssetMovement.Client(client);
+const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
 const keeta = `chain:keeta:${client.network}` as const;
 const base = client.network === 21378n ? 'chain:evm:8453' : 'chain:evm:84532';   // Base, or Base Sepolia on test
 const providers = await am.getProvidersForTransfer({ from: base, to: keeta }) ?? [];
@@ -151,6 +151,8 @@ console.log('Send USDC, EURC, cbBTC or KTA on Base to', address);
 
 ### Withdraw to Base
 
+Keeta Personal sends every withdrawal through `AnchorChaining` (see "Withdraw to any other chain" below, with `location: base`), which also builds the transfer reference when a provider's instruction carries none. Use the direct calls below when you need one provider's quote and instruction yourself.
+
 ```ts
 const out = { location: keeta };
 const withdrawProvider = (await am.getProvidersForTransfer({ asset: keetaUSDC, from: keeta, to: base }))
@@ -163,6 +165,7 @@ const transfer = await withdrawProvider.initiateTransfer({
 });
 const instruction = transfer.instructions.find((i) => i.type === 'KEETA_SEND');
 if (!instruction || instruction.type !== 'KEETA_SEND') throw new Error('no KEETA_SEND instruction');
+if (instruction.external === undefined) throw new Error('no external reference: run this withdrawal through AnchorChaining instead');
 // After approval, fund it exactly, including `external`:
 await client.send(instruction.sendToAddress, BigInt(instruction.value), instruction.tokenAddress, instruction.external);
 ```

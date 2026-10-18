@@ -6,17 +6,21 @@ import * as KeetaNet from '@keetanetwork/keetanet-client';
 
 // What each live test must print to pass. A test missing here fails, so a new one gets a check.
 const EXPECT = {
+	facts: [/network facts match the skills/],
+	// The quickstart reads the new wallet's address and KTA decimals, and finds test USDC through the resolver.
+	quickstart: [/Address: keeta_a/, /KTA balance \(base units\): 0n decimals: \d+/, /USDC token: keeta_a\w+ decimals: \d+/],
 	// Keeta's own Base bridge must give this wallet a Base Sepolia address for test USDC.
 	'deposit-addresses': [/on: 'chain:evm:84532',\s+to: '0x[0-9a-fA-F]{40}',[^}]*providers: \[ 'evm-anchor' \]/]
 };
 
-const tests = readdirSync(new URL('./live/', import.meta.url)).filter((name) => name.endsWith('.ts')).sort();
+// facts.ts is not a skill block: it checks the fixed values the skills state, on both networks.
+const tests = [...readdirSync(new URL('./live/', import.meta.url)).filter((name) => name.endsWith('.ts')).sort().map((name) => `live/${name}`), 'facts.ts'];
 let failed = 0;
 for (const file of tests) {
-	const name = file.replace(/\.ts$/, '');
+	const name = file.replace(/^live\//, '').replace(/\.ts$/, '');
 	const seed = KeetaNet.lib.Account.generateRandomSeed({ asString: true });
 	const started = Date.now();
-	const run = spawnSync('npx', ['tsx', `live/${file}`], {
+	const run = spawnSync('npx', ['tsx', file], {
 		cwd: new URL('.', import.meta.url),
 		env: { ...process.env, KEETA_NETWORK: 'test', KEETA_SEED: seed },
 		encoding: 'utf-8',

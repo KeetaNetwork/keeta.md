@@ -38,7 +38,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
    ```ts
    import * as KeetaAnchor from '@keetanetwork/anchor';
 
-   const am = new KeetaAnchor.AssetMovement.Client(client);
+   const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
    const providers = await am.getProvidersForTransfer({ from: keeta, rail: 'CARD_PUSH' }) ?? [];
    for (const p of providers) console.log(String(p.providerID), p.getLegalDisclaimers());

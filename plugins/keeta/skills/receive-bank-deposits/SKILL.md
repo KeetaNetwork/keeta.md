@@ -36,7 +36,7 @@ Use whenever someone needs to **receive money by bank transfer into a Keeta acco
    import * as KeetaAnchor from '@keetanetwork/anchor';
    import { Errors } from '@keetanetwork/anchor/services/asset-movement/common.js';
 
-   const am = new KeetaAnchor.AssetMovement.Client(client);
+   const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
    const providers = await am.getProvidersForTransfer({ from: 'bank-account:us', to: keeta }) ?? [];
    type Provider = (typeof providers)[number];

@@ -32,7 +32,7 @@ Workflows: [receive-bank-deposits](../../receive-bank-deposits/SKILL.md), [pay-o
 ## Discover
 
 ```ts
-const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [] });
+const resolver = new KeetaAnchor.lib.Resolver({ root: client.networkAddress, client, trustedCAs: [], metadataConfig: { signing: { account } } });
 const tokens = await resolver.listTokens();                 // [{ token: 'keeta_…', currency: 'USD' | '$KTA' | … }]
 const usd = await resolver.lookupToken('USD');              // { token, currency } | null
 const kycCountries = await resolver.listSupportedKYCCountries('individual');
@@ -40,7 +40,7 @@ const fx = await resolver.lookup('fx', { inputCurrencyCode: 'USD', outputCurrenc
 const plain = fx ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(fx) : null; // inspect as JSON
 ```
 
-- The service clients build this resolver for you (`new KeetaAnchor.FX.Client(client)`).
+- **Pass one signed resolver to every client** (`new KeetaAnchor.FX.Client(client, { resolver })`, `new AnchorChaining({ client, resolver })`). A client builds its own resolver when you pass none, but that one doesn't sign: a provider whose metadata requires `keeta-account` authentication then fails with "Signing is requested, but no signing configuration is provided" or drops out of discovery.
 - Prefer their typed methods (`getQuotes`, `getProvidersForTransfer`, `createVerification`…) over raw `lookup`.
 - <https://static.network.keeta.com/metadata/services> mirrors the metadata over HTTP. Treat it as a cache: if it disagrees with the resolver, trust the resolver and report the difference.
 
@@ -96,7 +96,7 @@ Use `AnchorChaining` to convert across providers, for example USD → EUR, or US
 ```ts
 import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
 
-const chaining = new AnchorChaining({ client });
+const chaining = new AnchorChaining({ client, resolver });
 const keetaChain = `chain:keeta:${client.network}` as const;
 const request = {
   source: { asset: keetaUSD, location: keetaChain, value: 200n, rail: 'KEETA_SEND' as const },
@@ -125,7 +125,7 @@ Use the [complete-kyc](../../complete-kyc/SKILL.md) skill for a person and [comp
 ## Usernames
 
 ```ts
-const usernames = new KeetaAnchor.Username.Client(client);
+const usernames = new KeetaAnchor.Username.Client(client, { resolver });
 const hit = await usernames.resolve('alice$exampleprovider');     // { account, username, providerID, … } | null
 const everywhere = await usernames.resolveMulti('alice');          // { [providerID]: result | null } | null
 const mine = await usernames.resolveMulti(client.account);         // account → usernames
@@ -142,7 +142,7 @@ const claimed = await usernames.claimUsername('alice$exampleprovider');
 ```ts
 import KeetaStorageAnchorClient from '@keetanetwork/anchor/services/storage/client.js';
 
-const storage = new KeetaStorageAnchorClient(client);   // not exported from the package root
+const storage = new KeetaStorageAnchorClient(client, { resolver });   // not exported from the package root
 const provider = (await storage.getProviders())?.[0];
 if (provider) {
   const base = `/user/${account.publicKeyString.get()}/`;
