@@ -37,6 +37,8 @@ Use to bring tokens from another chain into a Keeta account, or to send Keeta to
 
 ## SDK steps
 
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+
 The steps after the first use `const am = new KeetaAnchor.AssetMovement.Client(client, { resolver })`, `` const keeta = `chain:keeta:${client.network}` as const `` and the `base` location from the second step. For every provider, show its `providerID`, `provider.getLegalDisclaimers()`, fees and limits before anything moves.
 
 ### "What's my Base deposit address?" (any wallet, any chain)
