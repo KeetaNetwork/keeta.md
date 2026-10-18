@@ -24,6 +24,109 @@ Use for an on-chain conversion once the exact source and destination assets are 
 
 ## SDK steps
 
+### "Swap 1 KTA for USDC" (one script, any pair)
+
+This script asks anchor chaining for every route between two Keeta tokens, across FX anchors and asset-movement conversions, and prints each plan with what you send, what you receive and the fees. It moves nothing until the user has picked a plan and you rerun it with `KEETA_PLAN` and `KEETA_CONFIRMED=yes`. Set it up like the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network), save it as `swap.mts`, and run `KEETA_SEED=… KEETA_FROM='$KTA' KEETA_TO='$USDC' KEETA_AMOUNT=1 npx tsx swap.mts`.
+
+```ts
+// live-test: swap-quote
+import * as KeetaNet from '@keetanetwork/keetanet-client';
+import * as KeetaAnchor from '@keetanetwork/anchor';
+import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
+import { AnchorChaining } from '@keetanetwork/anchor/lib/chaining.js';
+import { decodeTokenMetadata } from '@keetanetwork/anchor/lib/token-metadata.js';
+import type { TokenAddress } from '@keetanetwork/keetanet-client/lib/account.js';
+
+const { Account } = KeetaNet.lib;
+const network = process.env.KEETA_NETWORK === 'main' ? 'main' : 'test';
+if (!process.env.KEETA_SEED) throw new Error('set KEETA_SEED');
+const account = Account.fromSeed(process.env.KEETA_SEED, 0);
+const client = KeetaNet.UserClient.fromNetwork(network, account);
+const resolver = new KeetaAnchor.lib.Resolver({ ...getDefaultResolverConfig(client), metadataConfig: { signing: { account } } });
+
+// A ticker from the network's token list ('$KTA', '$USDC', 'USD'…) or a token address.
+async function tokenFor(tickerOrAddress: string): Promise<TokenAddress> {
+  if (/^\$?KTA$/i.test(tickerOrAddress)) return client.baseToken;
+  const tokens = await resolver.listTokens();
+  const hit = tokens.find((t) => t.currency === tickerOrAddress || t.token === tickerOrAddress);
+  if (!hit) throw new Error(`no ${tickerOrAddress} token on ${network}; its tickers are ${tokens.map((t) => t.currency).join(', ')}`);
+  return Account.fromPublicKeyString(hit.token).assertKeyType(Account.AccountKeyAlgorithm.TOKEN);
+}
+async function decimalsOf(token: TokenAddress): Promise<number> {
+  const { info } = await client.client.getAccountInfo(token);
+  return decodeTokenMetadata(info.metadata).decimalPlaces;
+}
+function toBaseUnits(amount: string, decimals: number): bigint {
+  const [whole = '0', fraction = ''] = amount.split('.');
+  if (!/^\d+$/.test(whole) || !/^\d*$/.test(fraction) || fraction.length > decimals) throw new Error(`bad amount ${amount}`);
+  return BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, '0') || '0');
+}
+function format(amount: bigint, decimals: number): string {
+  const base = 10n ** BigInt(decimals);
+  const fraction = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
+  return fraction ? `${amount / base}.${fraction}` : `${amount / base}`;
+}
+
+try {
+  const from = await tokenFor(process.env.KEETA_FROM ?? '$KTA');
+  const to = await tokenFor(process.env.KEETA_TO ?? '$USDC');
+  const [fromDecimals, toDecimals] = [await decimalsOf(from), await decimalsOf(to)];
+  const value = toBaseUnits(process.env.KEETA_AMOUNT ?? '1', fromDecimals);
+  const keeta = `chain:keeta:${client.network}` as const;
+  const chaining = new AnchorChaining({ client, resolver });
+
+  // A source value fixes what you send; put `value` on the destination instead to fix what you receive.
+  const results = await chaining.getPlans({
+    source: { asset: from, location: keeta, rail: 'KEETA_SEND', value },
+    destination: { asset: to, location: keeta, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }
+  }, { includeAllOutput: true }) ?? [];
+  const plans = results.flatMap((result) => result.success ? [result.plan] : []);
+  console.log(`${plans.length} plan(s) for ${format(value, fromDecimals)} ${from.publicKeyString.get()} -> ${to.publicKeyString.get()} on ${network}`);
+  // What this source converts into on this network, whether or not the requested pair has a route.
+  const { to: reachable } = await chaining.graph.resolveAssetsWithMetadata({ from: { asset: from, location: keeta }, to: { location: keeta } });
+  const names: string[] = [];
+  for (const { asset } of reachable) {
+    if (typeof asset === 'string' || asset.comparePublicKey(from)) continue;
+    const { info } = await client.client.getAccountInfo(asset);
+    names.push(`${info.name || '(unnamed)'} ${asset.publicKeyString.get()}`);
+  }
+  console.log('can convert into:', names.join(', ') || 'nothing');
+  for (const result of results) {
+    if (!result.success) console.log({ unavailableVia: result.failedAt.providerID, reason: result.error instanceof Error ? result.error.message : String(result.error) });
+  }
+  for (const [n, plan] of plans.entries()) {
+    console.log({
+      plan: n,
+      send: format(plan.plan.totalValueIn, fromDecimals),
+      receive: format(plan.plan.totalValueOut, toDecimals),
+      steps: plan.path.map((step) => `${step.type}:${step.providerID ?? 'keeta-send'}`),
+      fees: plan.listFees().lineItems.map((fee) => ({ purpose: fee.purpose, value: fee.value, basisPoints: fee.basisPoints }))
+    });
+  }
+
+  // Execute only the plan the user picked, after they confirmed it.
+  const chosen = plans[Number(process.env.KEETA_PLAN ?? -1)];
+  if (chosen && process.env.KEETA_CONFIRMED === 'yes') {
+    chosen.on('stepNeedsAction', (event) => {
+      if (event.type === 'keetaSendAuthRequired') event.markCompleted({ sent: false });   // the plan publishes the send
+      else event.markFailed(new Error(`manual step ${event.type} not supported`));
+    });
+    await chosen.execute({ requireSendAuth: true });
+    console.log('done; new balance:', format(await client.balance(to), toDecimals));
+  }
+} finally {
+  await client.destroy();
+}
+```
+
+- Show the user every plan: what they send, what they receive (an estimate unless the step is a signed FX quote), each step's provider and every fee. Never pick plan 0 for them.
+- Rerun right before executing: FX quotes inside a plan expire about five minutes after they are signed.
+- **Networks.** On main, KTA → USDC quotes through an FX anchor in one step (CI checks this daily). On test, KTA has no USDC route; it converts only into demo tokens, which the `can convert into` line lists, so test a swap with one of those.
+- A wallet with no balance still gets plans, so quoting is safe on a new wallet. `LEDGER_INVALID_BALANCE` at execution means it can't cover the amount plus KTA fees.
+- No plans at all means no provider serves the pair on this network right now. Report it with the `can convert into` list, and let the user pick another pair; don't pick one for them.
+
+The steps below show the same flow one client at a time, for when you need a single provider's signed quote.
+
 1. Confirm the network, source token, destination token or currency, amount and **affinity**. `affinity: 'from'` fixes the amount you send; `'to'` fixes the amount you receive.
 2. Discover pairs and request quotes:
 

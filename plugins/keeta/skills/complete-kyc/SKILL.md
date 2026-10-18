@@ -41,7 +41,9 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
    console.log('Open in a browser:', verification.webURL.toString());
    ```
 
-   Treat `webURL` as a bearer link: give it only to the person being verified. Persist `verification.providerID` and `verification.id`, so you can resume later with `kyc.getVerificationStatus(providerID, { id, account, countryCodes, entityType })`.
+   - Treat `webURL` as a bearer link: give it only to the person being verified.
+   - `verification.expectedCost` is `{ min, max, token }` in base units of that token, when the provider charges. Show it with the token's decimals before the person starts.
+   - Persist `verification.providerID` and `verification.id`. Later, `kyc.getVerificationStatus(providerID, { id, account, countryCodes, entityType })` reads the status, and `kyc.getVerificationURL(providerID, { id, account, countryCodes, entityType })` gets a fresh link if the person lost theirs or it expired (`null` means this provider can't reissue one: start a new verification).
 3. Poll with backoff until there is a result:
 
    ```ts
@@ -65,7 +67,7 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
    ```
 
 5. Verify with `await client.getCertificates()`.
-6. When an asset-movement provider raises `KYCShareNeeded`, share exactly `error.neededAttributes` with `error.shareWithPrincipals`. Use `SharableCertificateAttributes.fromCertificate(...)`, `grantAccess(principal)` and `provider.shareKYCAttributes({ account, attributes })`. The full code is in the [identity reference](../keeta/references/identity.md).
+6. When an asset-movement provider raises `KYCShareNeeded`, share exactly `error.neededAttributes` with `error.shareWithPrincipals`, from a certificate whose issuer is in `error.acceptedIssuers`. Use `SharableCertificateAttributes.fromCertificate(...)`, `grantAccess(principal)` and `provider.shareKYCAttributes({ account, attributes })`, then retry the call that raised it. The full code, including picking the certificate, is in the [identity reference](../keeta/references/identity.md#share-only-what-is-asked-selective-disclosure).
    - **Terms of service.** If the error carries `tosFlow` (Bridge.xyz does), the person opens `tosFlow.url` and accepts the terms. Then pass the signed agreement ID that page returns: `provider.shareKYCAttributes({ account, attributes, tosAgreement: { id } })`. The page hands the ID (`signedAgreementId`) to the app that embeds it. If you can't embed the page and receive the ID, stop. Never invent one.
    - **Pending review.** Sharing can return while review is still pending. After that, `AdditionalKYCNeeded` means "wait and retry" or "a person must finish `toCompleteFlow.url`".
 
@@ -81,6 +83,8 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
 - **`pending`, `incomplete` or manual review:** report the status and retry guidance. Don't claim the person is verified.
 - **`fail`, `error`, or an expired or rejected certificate:** don't attach or share it.
 - **`AdditionalKYCNeeded`:** the person completes `toCompleteFlow.url`, then you retry.
+- **No certificate from an accepted issuer:** the provider doesn't trust the issuer of the certificates on the account. Verify with a KYC provider whose issuer is in `acceptedIssuers`; don't share a different certificate.
+- **`KeetaAnchorUserValidationError`** (import it from `@keetanetwork/anchor/lib/error.js`): `error.fields` lists each rejected field with its `path`, `message` and any `allowedValues`. A provider that doesn't serve the person's region (Bivo doesn't onboard EU or Texas residents) rejects that way, for example on the address's state or subdivision. Report the message and stop; never change the person's details to get past it.
 - **Personal data:** keep it out of logs, prompts, source files and on-chain `external` fields. Decrypted certificate attributes stay local.
 
 ## Related skills

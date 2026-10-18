@@ -81,5 +81,5 @@ jobs:
           cache: npm
           cache-dependency-path: tests/snippets/package-lock.json
       - run: npm ci
-      - name: Run each live-test block with a new test-network wallet
+      - name: Run each live-test block with a new wallet on both networks
         run: npm run live

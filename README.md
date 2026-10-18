@@ -48,7 +48,7 @@ Other sites (keeta.ai, keeta.com) link here with the same commands rather than c
 
 ## Accuracy policy
 
-- **Verified code.** Every TypeScript block typechecks against the published packages: `@keetanetwork/keetanet-client` 0.18.8, `@keetanetwork/anchor` 0.0.104 and `@x402/*` 2.28.0 (pinned in `tests/snippets/package.json`). CI checks every block on each pull request, and runs the blocks marked `// live-test:` against the test network with a new wallet.
+- **Verified code.** Every TypeScript block typechecks against the published packages: `@keetanetwork/keetanet-client` 0.18.8, `@keetanetwork/anchor` 0.0.104 and `@x402/*` 2.28.0 (pinned in `tests/snippets/package.json`). CI checks every block on each pull request, and runs the blocks marked `// live-test:` on both the test network and main with a new wallet (read-only on main: nothing moves value or creates production addresses).
 - **Sources.** SDK methods and types come from the published packages, [Keeta docs](https://docs.keeta.com/) and public Keeta repositories. Partner capabilities (Bivo, Bridge.xyz, LayerZero, OneFootprint) describe Keeta's provider integrations. Skills confirm them at run time through discovery.
 - **Runtime discovery.** Providers, corridors and token addresses are discovered when the skill runs. Availability varies by account and network, and the examples don't claim any service is available right now.
 - **No private details.** Skills never publish fee schedules, internal hostnames, credentials or account allowlists. Fees and limits are read from each provider at run time.

@@ -30,6 +30,8 @@ Use for a direct on-chain transfer of a specific Keeta token, or to tell someone
 2. **Parse and validate** the recipient and the token. Each must be the right kind of address:
 
    ```ts
+   import * as KeetaNet from '@keetanetwork/keetanet-client';
+
    const Account = KeetaNet.lib.Account;
    const recipient = Account.fromPublicKeyString(recipientAddress);      // throws if malformed
    if (recipient.isToken()) throw new Error('recipient is a token address, not an account');
@@ -37,6 +39,27 @@ Use for a direct on-chain transfer of a specific Keeta token, or to tell someone
      .assertKeyType(Account.AccountKeyAlgorithm.TOKEN);                 // throws unless it is a token
    ```
 
+   - **The recipient is a username** ("pay @alice", `alice$provider`). Look it up across the username providers, and never guess between matches:
+
+     ```ts
+     import * as KeetaAnchor from '@keetanetwork/anchor';
+
+     const usernames = new KeetaAnchor.Username.Client(client, { resolver });
+     if (!(await resolver.lookup('username', {}))?.length) throw new Error('this network lists no username provider: ask for the Keeta address instead');
+     const name = '@Alice'.trim().replace(/^@/, '').toLowerCase();         // names are stored lowercase
+     type Match = NonNullable<Awaited<ReturnType<typeof usernames.resolve>>>;
+     const matches = Object.values((await usernames.resolveMulti(name)) ?? {}).filter((hit): hit is Match => hit != null);
+     for (const hit of matches) console.log(hit.globallyIdentifiableUsername, hit.account.publicKeyString.get());
+     const [only, ...others] = matches;
+     if (!only) throw new Error(`no Keeta user named ${name}`);
+     if (others.length) throw new Error('several providers know this name: ask which one');
+     const recipient = only.account;
+     ```
+
+     Today neither test nor main lists a username provider in its resolver (CI checks this daily), so expect that first error and ask the person for the recipient's `keeta_…` address. Never guess an address from a name.
+
+     Show the full username with its provider (`alice$provider`) and the address it resolves to in the confirmation. To show who an incoming payment is from, `resolveMulti(senderAccount)` maps an account back to its usernames.
+   - **The token is a ticker** ("send 5 USDC"). Get its address with the keeta quickstart's `tokenFor('$USDC')` (the resolver's token list for the network), never from memory.
 3. **Check funds.** Read the token's balance, and the KTA balance for fees (`client.balance(client.baseToken)`). Keep amounts as `bigint` base units, and read the token's decimals from its metadata before you display a decimal amount ([multi-asset-balances](../multi-asset-balances/SKILL.md)).
 4. **Confirm.** Present the network, recipient, token address, base-unit amount (plus the decimal amount if verified) and the external reference.
 5. **Send** after approval:

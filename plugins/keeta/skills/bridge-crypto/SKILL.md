@@ -46,7 +46,9 @@ Every Keeta wallet can get a free deposit address on Base from Keeta's own bridg
 ```bash
 npm init -y && npm pkg set type=module   # Node.js 24; see the keeta quickstart
 npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 tsx
-KEETA_SEED=… KEETA_NETWORK=main npx tsx deposit-address.mts          # KEETA_FROM_CHAIN=chain:evm:42161 for Arbitrum
+KEETA_SEED=… KEETA_NETWORK=main npx tsx deposit-address.mts          # production: an address on Base (8453)
+KEETA_SEED=… npx tsx deposit-address.mts                            # test network: an address on Base Sepolia (84532)
+# KEETA_FROM_CHAIN=chain:evm:42161 for Arbitrum; KEETA_LIST_ONLY=yes lists what can be deposited without creating an address
 ```
 
 ```ts
@@ -85,6 +87,11 @@ try {
     });
     for (const destination of to) {
       if (typeof destination.asset === 'string') continue;   // Keeta tokens are account objects
+      if (process.env.KEETA_LIST_ONLY === 'yes') {
+        // "What can I deposit from Base?" without creating an address yet.
+        console.log({ send: sourceAsset.metadata?.ticker ?? sourceAsset.asset, on: source, arrivesAs: destination.asset.publicKeyString.get() });
+        continue;
+      }
       // 3. A forwarding-only plan resolves the deposit address: it reuses the wallet's existing address or creates one.
       const results = await chaining.getPlans({
         source: { asset: sourceAsset.asset, location: sourceAsset.location, rail: 'EVM_SEND', value: 1_000_000n },
@@ -113,6 +120,7 @@ try {
 ```
 
 - **What it prints:** one entry per token and route: the token on the source chain, the deposit address (`to`), the Keeta token it arrives as, the providers on the route and their fees. Keeta's bridge (provider `keeta` on main, `evm-anchor` on test) gives one address for all four of its Base tokens, with no fee lines. A route that needs onboarding or identity first, such as Bridge.xyz's or Bivo's, prints `unavailableVia` with the provider's reason (for example `User Not Onboarded to Asset Movement Service`) instead; the Keeta bridge address is still valid.
+- **Both networks run the same script.** CI runs it on test (Base Sepolia, provider `evm-anchor`) and lists the Base routes on main (provider `keeta`) every day.
 - **Getting it is free and changes nothing on chain.** Asking again returns the same address, because the provider reuses the wallet's existing one. No approval is needed to look it up.
 - **Show it with its chain and tokens:** "Send only USDC, EURC, cbBTC or KTA on Base to `0x…`. Other tokens or networks are not watched and may be lost." List exactly the tokens the script printed for that address.
 - A deposit smaller than the network fee may not be credited. Deposits from Base work only through this address: `initiateTransfer` from an EVM source is rejected.
