@@ -31,19 +31,46 @@ await client.modifyCertificate(KeetaNet.lib.Block.AdjustMethod.SUBTRACT, cert.ha
 
 ## Share only what is asked (selective disclosure)
 
-When an anchor raises `KYCShareNeeded`, it lists the attributes it needs (`neededAttributes`) and who should receive them (`shareWithPrincipals`). Share exactly those, after the user consents:
+When an anchor raises `KYCShareNeeded`, it lists the attributes it needs (`neededAttributes`), who should receive them (`shareWithPrincipals`), and which certificate issuers it trusts (`acceptedIssuers`). Pick a certificate those issuers signed, then share exactly those attributes, after the user consents:
 
 ```ts
 import * as KeetaAnchor from '@keetanetwork/anchor';
+import { Errors } from '@keetanetwork/anchor/services/asset-movement/common.js';
 
-const [record] = await client.client.getAllCertificates(account);
-if (!record) throw new Error('no on-chain KYC certificate');
-const cert = new KeetaAnchor.lib.Certificates.Certificate(record.certificate.toPEM(), { subjectKey: account });
-const intermediates = record.intermediates ? new Set(record.intermediates.getCertificates()) : undefined;
-const sharable = await KeetaAnchor.lib.Certificates.SharableCertificateAttributes.fromCertificate(cert, intermediates, neededAttributes);
-for (const principal of shareWithPrincipals) await sharable.grantAccess(principal);
-await provider.shareKYCAttributes({ account, attributes: sharable });
+const { Certificate, SharableCertificateAttributes } = KeetaAnchor.lib.Certificates;
+type DN = { name: string; value: string }[];
+const sameDN = (a: DN, b: DN) => a.length === b.length && a.every(({ name, value }) => b.some((part) => part.name === name && part.value === value));
+
+try {
+  await provider.initiateTransfer(request);                    // or whichever call raised it
+} catch (error) {
+  if (!Errors.KYCShareNeeded.isInstance(error)) throw error;
+
+  // acceptedIssuers holds the subject DNs of issuers the provider trusts ("any of"). A certificate
+  // qualifies when one of them signed it or appears in its chain. An empty list accepts any issuer.
+  const records = await client.client.getAllCertificates(account);
+  const record = records.find(({ certificate, intermediates }) => {
+    const chain: DN[] = [certificate.issuerDN, ...(intermediates?.getCertificates() ?? []).flatMap((cert) => [cert.subjectDN, cert.issuerDN])];
+    return error.acceptedIssuers.length === 0 || error.acceptedIssuers.some((dn) => chain.some((link) => sameDN(dn, link)));
+  });
+  if (!record) throw new Error('no certificate from an issuer this provider accepts: complete KYC with one it lists');
+
+  // Share only the named attributes. With no list, the provider gets every attribute, so ask about that first.
+  if (!error.neededAttributes) throw new Error('the provider named no attributes: confirm before sharing the whole certificate');
+  const names = error.neededAttributes.map((name) => {
+    KeetaAnchor.lib.Certificates.SharableCertificateAttributes.assertCertificateAttributeName(name);   // throws on a name the SDK doesn't know
+    return name;
+  });
+
+  const cert = new Certificate(record.certificate.toPEM(), { subjectKey: account });
+  const intermediates = record.intermediates ? new Set(record.intermediates.getCertificates()) : undefined;
+  const sharable = await SharableCertificateAttributes.fromCertificate(cert, intermediates, names);
+  for (const principal of error.shareWithPrincipals) await sharable.grantAccess(principal);
+  await provider.shareKYCAttributes({ account, attributes: sharable });   // then retry the original call
+}
 ```
+
+Show the user the provider, the attribute names and the principals before `shareKYCAttributes`, and wait for consent.
 
 Opening a certificate with `subjectKey: account` decrypts its sensitive attributes locally. Keep the decrypted values out of logs, prompts and on-chain fields.
 
