@@ -6,7 +6,8 @@
   "scripts": {
     "extract": "python3 ../../.github/scripts/extract-snippets.py",
     "typecheck": "npm run extract && tsc -p tsconfig.json",
-    "live": "npm run extract && node live.mjs"
+    "live": "npm run extract && node live.mjs",
+    "trials": "node trials.mjs"
   },
   "dependencies": {
     "@keetanetwork/anchor": "0.0.104",

@@ -85,7 +85,7 @@ try {
     // 2. The Keeta token each one arrives as.
     const { to } = await chaining.graph.resolveAssetsWithMetadata({
       from: { asset: sourceAsset.asset, location: sourceAsset.location },
-      to: { location: keeta, rail: 'KEETA_SEND' }, forwardingOnly: { method: 'explicit' }
+      to: { location: keeta, rail: 'KEETA_SEND' }, forwardingOnly: { method: 'implied' }, maxStepCount: 3   // same filter as step 1
     });
     for (const destination of to) {
       if (typeof destination.asset === 'string') continue;   // Keeta tokens are account objects
@@ -95,6 +95,7 @@ try {
         continue;
       }
       // 3. A forwarding-only plan resolves the deposit address: it reuses the wallet's existing address or creates one.
+      //    `value` is only a placeholder: forwarding-only plans don't check it against minimums.
       const results = await chaining.getPlans({
         source: { asset: sourceAsset.asset, location: sourceAsset.location, rail: 'EVM_SEND', value: 1_000_000n },
         destination: { asset: destination.asset, location: keeta, rail: 'KEETA_SEND', recipient: account.publicKeyString.get() }
@@ -108,8 +109,10 @@ try {
           console.log({ send, on: source, arrivesAs, unavailableVia: result.failedAt.providerID, reason });
           continue;
         }
+        // The smallest deposit the first leg credits, in the source token's base units, when the provider states one.
+        const minimum = result.plan.plan.steps.flatMap((step) => step.type === 'forwarded' && step.persistentAddress.minimumTransferValue ? [step.persistentAddress.minimumTransferValue.value] : [])[0];
         console.log({
-          send, sourceAsset: sourceAsset.asset, on: source, to: result.plan.getDepositAddress(), arrivesAs,
+          send, sourceAsset: sourceAsset.asset, on: source, to: result.plan.getDepositAddress(), arrivesAs, minimum,
           providers: result.plan.path.map((step) => step.providerID ?? 'keeta-send'),
           fees: result.plan.listFees().lineItems.map((fee) => ({ purpose: fee.purpose, value: fee.value, basisPoints: fee.basisPoints }))
         });
@@ -121,11 +124,11 @@ try {
 }
 ```
 
-- **What it prints:** one entry per token and route: the token on the source chain, the deposit address (`to`), the Keeta token it arrives as, the providers on the route and their fees. Keeta's bridge (provider `keeta` on main, `evm-anchor` on test) gives one address for all four of its Base tokens, with no fee lines. A route that needs onboarding or identity first, such as Bridge.xyz's or Bivo's, prints `unavailableVia` with the provider's reason (for example `User Not Onboarded to Asset Movement Service`) instead; the Keeta bridge address is still valid.
+- **What it prints:** one entry per token and route: the token on the source chain (`send` is its ticker, such as `USDC`, or its contract `evm:0x…`), the deposit address (`to`, or `null` when the plan has none), the Keeta token it arrives as, the smallest deposit the provider credits (`minimum`, in the source token's base units, when stated), the providers on the route and their fees. Keeta's bridge (provider `keeta` on main, `evm-anchor` on test) gives one address for all four of its Base tokens, with no fee lines. A route that needs onboarding or identity first, such as Bridge.xyz's or Bivo's, prints `unavailableVia` with the provider's reason (for example `User Not Onboarded to Asset Movement Service`) instead; the Keeta bridge address is still valid.
 - **Both networks run the same script.** CI runs it on test (Base Sepolia, provider `evm-anchor`) and lists the Base routes on main (provider `keeta`) every day.
-- **Getting it is free and changes nothing on chain.** Asking again returns the same address, because the provider reuses the wallet's existing one. No approval is needed to look it up.
+- **Getting it is free, publishes nothing on chain, and works for a brand-new, unfunded wallet.** The first call creates the address at the provider; asking again returns the same one. No approval is needed. When you must not create anything (a read-only or main-network check), run with `KEETA_LIST_ONLY=yes`, which lists the routes without resolving an address.
 - **Show it with its chain and tokens:** "Send only USDC, EURC, cbBTC or KTA on Base to `0x…`. Other tokens or networks are not watched and may be lost." List exactly the tokens the script printed for that address.
-- A deposit smaller than the network fee may not be credited. Deposits from Base work only through this address: `initiateTransfer` from an EVM source is rejected.
+- When the entry has a `minimum`, tell the user to send at least that much; a smaller deposit may not be credited. Deposits from Base work only through this address: `initiateTransfer` from an EVM source is rejected.
 - **No output, or `no deposit route`:** that chain isn't served on this network (LayerZero routes exist only on main). Stop and say so; never guess an address.
 - **From a wallet's own code:** the same three calls run anywhere the SDK runs. Inside an app that already has a `client`, drop the seed and network lines.
 
@@ -203,7 +206,8 @@ const chaining = new AnchorChaining({ client, resolver });
 const keetaUSDC = await tokenFor('$USDC');                       // helper from the keeta quickstart
 const plan = (await chaining.getPlans({
   source: { asset: keetaUSDC, location: keeta, rail: 'KEETA_SEND', value: amount },
-  // USDC on Arbitrum One (main). For Base use `base` and the token's Base contract; KTA is `client.baseToken`.
+  // USDC on Arbitrum One (main). For Base use location `base` and the token's Base contract from the table above
+  // (KTA is 'evm:0xc0634090F2Fe6c6d75e61Be2b949464aBB498973'); `client.baseToken` is KTA's Keeta side, the source.
   destination: { asset: 'evm:0xaf88d065e77c8cC2239327C5EDb3A432268e5831', location: 'chain:evm:42161', rail: 'EVM_SEND', recipient: evmRecipient }
 }))?.[0];
 if (!plan) throw new Error('no route to that chain and token');

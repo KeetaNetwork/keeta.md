@@ -74,6 +74,7 @@ setup.updatePermissions(teammate, new Permissions(['SEND_ON_BEHALF']), usdc, Blo
 await setup.publish();
 
 await client.send(vault, amount, usdc);                                   // deposit: a normal send
+await client.send(vault, feeBudgetKta, client.baseToken);                  // blocks published from the vault pay KTA fees from it
 await client.send(recipient, amount, usdc, undefined, { account: vault }); // spend: owner or SEND_ON_BEHALF principal
 const balances = await client.allBalances({ account: vault });
 const myVaults = (await client.listACLsByPrincipal()).filter((acl) => acl.entity.isStorage());
@@ -85,7 +86,7 @@ To create a **single-token vault**, leave `STORAGE_CAN_HOLD` out of the default 
 await client.updatePermissions(usdc, new Permissions(['STORAGE_CAN_HOLD']), undefined, Block.AdjustMethod.ADD, { account: vault });
 ```
 
-Sends of any other token then fail with a permissions error.
+Sends of any other token then fail with a permissions error. The vault still pays KTA fees for the blocks published from it, so also allow `client.baseToken` (KTA) the same way and keep a little KTA in it.
 
 ## Multisig
 

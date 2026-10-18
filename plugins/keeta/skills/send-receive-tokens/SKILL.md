@@ -28,7 +28,7 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
      const request = KeetaAnchor.lib.URI.encodeKeetaURI({ type: 'send', to: account, token, value: amount, external: ['invoice-1001'] });
      ```
 
-   - Detect arrival with `client.on('change', …)`, or poll `balance(token)` or `history({ depth })`.
+   - Detect arrival with `client.on('change', …)`, or poll `balance(token)` or the wallet history ([multi-asset-balances](../multi-asset-balances/SKILL.md#what-did-i-do-recently-wallet-history)).
 2. **Parse and validate** the recipient and the token. Each must be the right kind of address:
 
    ```ts
@@ -62,7 +62,7 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 
      Show the full username with its provider (`alice$provider`) and the address it resolves to in the confirmation. To show who an incoming payment is from, `resolveMulti(senderAccount)` maps an account back to its usernames.
    - **The token is a ticker** ("send 5 USDC"). Get its address with the keeta quickstart's `tokenFor('$USDC')` (the resolver's token list for the network), never from memory.
-3. **Check funds.** Read the token's balance, and the KTA balance for fees (`client.balance(client.baseToken)`). Keep amounts as `bigint` base units, and read the token's decimals from its metadata before you display a decimal amount ([multi-asset-balances](../multi-asset-balances/SKILL.md)).
+3. **Check funds.** Read the token's balance, and the KTA balance for fees (`client.balance(client.baseToken)`). A plain `send()` shows no fee before publishing, so leave KTA headroom; to preview one, build the blocks with `client.initBuilder()` and pass them to `client.getQuotes(blocks)`, whose quotes carry each representative's `fee`. To read another account's balance, pass it: `client.balance(token, { account: other })` or `client.allBalances({ account: other })`. Keep amounts as `bigint` base units, and read the token's decimals from its metadata before you display a decimal amount ([multi-asset-balances](../multi-asset-balances/SKILL.md)).
 4. **Confirm.** Present the network, recipient, token address, base-unit amount (plus the decimal amount if verified) and the external reference.
 5. **Send** after approval:
 
@@ -75,8 +75,8 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 
    - `externalIdentifier` is optional, **public** and limited to 1024 characters from `[-_A-Za-z0-9+/= ]`.
    - Use it for invoice numbers or the reference an anchor gives you, never for personal data.
-6. **Verify.** Refresh `balance(token)`, find the entry in `history({ depth: 10 })`, and give the user an explorer link: `https://explorer.test.keeta.com/block/<hash>` or `https://explorer.keeta.com/block/<hash>`.
-7. **Batch.** To pay several recipients at once, put the sends in one builder. The batch settles together or not at all:
+6. **Verify.** Refresh `balance(token)`, find the send in the wallet history (`UserHistory.list`, the default for wallet agents: see [multi-asset-balances](../multi-asset-balances/SKILL.md#what-did-i-do-recently-wallet-history)), and give the user an explorer link: `https://explorer.test.keeta.com/block/<hash>` or `https://explorer.keeta.com/block/<hash>`.
+7. **Batch.** To pay several recipients at once, put the sends in one builder. The batch settles together or not at all. Confirm every row as in step 4 (the amounts below are placeholders in base units); `publish()` returns the same `{ from, voteStaple | blocks }` shape as step 5, so verify each hash as in step 6:
 
    ```ts
    const builder = client.initBuilder();

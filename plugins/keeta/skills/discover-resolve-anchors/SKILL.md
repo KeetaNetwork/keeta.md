@@ -48,7 +48,14 @@ Which providers appear varies by account and network. Who may use each one (indi
    const fxProviders = await resolver.lookup('fx', { inputCurrencyCode: '$KTA', outputCurrencyCode: '$USDC' });
    const onRamps = await resolver.lookup('assetMovement', { from: 'bank-account:us', to: `chain:keeta:${client.network}` });   // by location; read the token from the provider's paths
    const businessKYC = await resolver.lookup('kyc', { countryCodes: ['US'], entityType: 'business' });
-   const plain = fxProviders ? await KeetaAnchor.lib.Resolver.Metadata.fullyResolveValuizable(fxProviders) : null;
+   const plain = await toPlain(fxProviders);   // { [providerID]: { ...metadata } } or undefined
+   // Lookup results mix plain objects with lazy values, so resolve them one by one to inspect as JSON
+   async function toPlain(v: unknown): Promise<unknown> {
+     if (typeof v === 'function') { try { return await toPlain(await v('any')); } catch { return null; } }
+     if (Array.isArray(v)) return Promise.all(v.map(toPlain));
+     if (v !== null && typeof v === 'object') return Object.fromEntries(await Promise.all(Object.entries(v).map(async ([k, x]) => [k, await toPlain(x)])));
+     return v;
+   }
    ```
 
    - Service types are `fx`, `assetMovement`, `kyc`, `username`, `storage` and `notification`.

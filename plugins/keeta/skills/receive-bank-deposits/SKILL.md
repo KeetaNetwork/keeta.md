@@ -19,9 +19,9 @@ Use whenever someone needs to **receive money by bank transfer into a Keeta acco
 
 - **Bivo Inc. (NMLS #2572288)** is a licensed money transmitter. It provides payment accounts and international payments on Keeta. Identity verification is by OneFootprint, through a Keeta KYC certificate.
 - **No advance notice:** deposits to the named account don't need to be announced. Confirm each one with `listTransactions` or the balance.
-- **Bivo's Keeta tokens are changing.** On main, Bivo's listing pays from and credits tokens named by currency code: USD, EUR, GBP, CAD, AED, HKD, JPY, MXN and CNY. Bivo is moving them to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`, `$KBGBP`, `$KBCAD`, `$KBMXN`, `$KBJPY` and `$KBAED`, which main's token list already carries. Bivo's newer listing (on test today) uses its own test token, which the token list doesn't name; it adds RTP deposits and card payouts on US accounts, and takes stablecoin deposits through persistent addresses.
+- **Bivo's Keeta tokens are changing.** On main, Bivo's listing pays from and credits tokens named by currency code: USD, EUR, GBP, CAD, AED, HKD, JPY, MXN and CNY. Bivo is moving them to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`, `$KBGBP`, `$KBCAD`, `$KBMXN`, `$KBJPY` and `$KBAED`, which main's token list already carries. Bivo on test (its newer listing) uses its own test token, which the token list doesn't name; it adds RTP deposits and card payouts on US accounts, and takes stablecoin deposits through persistent addresses.
 - **Take Bivo's token from its paths on every run,** never from a ticker. USD, `$KBUSD` and `$KUSD` are three different tokens: `$KUSD` is Keeta's abstract dollar token, which the stablecoin FX anchor converts 1:1 with `$KBUSD` ([convert-via-anchors](../convert-via-anchors/SKILL.md)). A provider accepts only the tokens its paths list, so convert first when the user holds a different one.
-- **Who can use it:** individuals with KYC. Bivo's newer listing doesn't onboard residents of the EU or Texas. Bridge.xyz needs a US SSN or a national tax ID from a supported country; tax IDs from the UK, Spain, Switzerland, Singapore, Argentina, Colombia and Uruguay aren't supported. These bank features don't serve businesses yet. See "Match services to your principal" in the [keeta](../keeta/SKILL.md) skill.
+- **Who can use it:** individuals with KYC. Bivo on test (its newer listing) doesn't onboard residents of the EU or Texas; Bivo on main (its original listing) has no such limit, though its stablecoin conversions still exclude them. Bridge.xyz needs a US SSN or a national tax ID from a supported country; tax IDs from the UK, Spain, Switzerland, Singapore, Argentina, Colombia and Uruguay aren't supported. These bank features don't serve businesses yet. See "Match services to your principal" in the [keeta](../keeta/SKILL.md) skill.
 - **Other ways in:**
   - stablecoins from another chain: [bridge-crypto](../bridge-crypto/SKILL.md)
   - a debit card: [card-payments](../card-payments/SKILL.md)
@@ -30,7 +30,7 @@ Use whenever someone needs to **receive money by bank transfer into a Keeta acco
 
 ## SDK steps
 
-Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver`, `tokenFor` and `decimalsOf`, on the network the user chose (test unless they said main).
 
 1. Use a Keeta account the user controls ([create-fund-wallet](../create-fund-wallet/SKILL.md)). Bivo and Bridge.xyz serve **verified individuals**, so the user needs a Keeta KYC certificate ([complete-kyc](../complete-kyc/SKILL.md)).
 2. Discover providers that take US bank deposits, and the Keeta token each one credits:
@@ -41,7 +41,11 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 
    const am = new KeetaAnchor.AssetMovement.Client(client, { resolver });
    const keeta = `chain:keeta:${client.network}` as const;
-   const providers = await am.getProvidersForTransfer({ from: 'bank-account:us', to: keeta }) ?? [];
+   // Only providers that issue standing deposit details (a named account); Bridge.xyz's one-time deposits are step 5.
+   const providers = [];
+   for (const p of await am.getProvidersForTransfer({ from: 'bank-account:us', to: keeta, rail: 'ACH' }) ?? []) {
+     if (await p.isOperationSupported('createPersistentForwarding')) providers.push(p);
+   }
    type Provider = (typeof providers)[number];
 
    // The Keeta tokens a provider credits for deposits from `source`, read from its published paths.
@@ -62,29 +66,45 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 
    ```ts
    const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
-   const tokenId = provider ? creditedTokens(provider, 'bank-account:us')[0] : undefined;   // the provider's Keeta USD token
-   if (!provider || !tokenId) throw new Error('no bank-deposit provider for this account on this network');
-   const usd = KeetaAnchor.KeetaNet.lib.Account.fromPublicKeyString(tokenId).assertKeyType(KeetaAnchor.KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
+   const tokenIds = provider ? creditedTokens(provider, 'bank-account:us') : [];   // the provider's Keeta USD token(s)
+   if (!provider || tokenIds.length === 0) throw new Error('no bank-deposit provider for this account on this network');
+   // During Bivo's move to $KBUSD its paths can list two USD tokens: show them and let the user pick if so.
+   const usd = KeetaAnchor.KeetaNet.lib.Account.fromPublicKeyString(tokenIds[0]).assertKeyType(KeetaAnchor.KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
    const asset = { from: 'USD' as const, to: usd };
-   try {
-     const details = await provider.createPersistentForwardingAddress({
-       account, asset,
-       sourceLocation: 'bank-account:us', destinationLocation: keeta,
-       destinationAddress: account.publicKeyString.get(),
-       incomingRail: 'ACH'                                                // or 'WIRE', 'RTP_PUSH'
-     });
-     console.log(details.address, details.depositMessage, details.minimumTransferValue, details.fees);
-   } catch (error) {
-     if (Errors.KYCShareNeeded.isInstance(error)) { /* share error.neededAttributes with error.shareWithPrincipals, then retry */ }
-     else if (Errors.AdditionalKYCNeeded.isInstance(error)) {
-       if (error.toCompleteFlow) console.log('The person must finish this step:', error.toCompleteFlow.url);   // then retry
-       /* otherwise review is pending (often under an hour): wait, then retry */
+
+   // Each failure names what is missing; handle it, then ask again. The same call returns the existing account.
+   let details;
+   for (let round = 0; !details; round++) {
+     if (round === 5) throw new Error('still not ready after 5 rounds: report the open items to the user');
+     try {
+       details = await provider.createPersistentForwardingAddress({
+         account, asset,
+         sourceLocation: 'bank-account:us', destinationLocation: keeta,
+         destinationAddress: account.publicKeyString.get(),
+         incomingRail: 'ACH'                                                // or 'WIRE', 'RTP_PUSH'
+       });
+     } catch (error) {
+       if (Errors.KYCShareNeeded.isInstance(error)) { await shareRequestedKYC(error); continue; }   // identity.md's share block, after consent
+       if (Errors.UserActionNeeded.isInstance(error)) {
+         const builder = client.initBuilder();
+         Errors.UserActionNeeded.addOperationsToBuilder(error.actionsNeeded, builder);   // explain the grant first (below)
+         if (!(await askApproval(`Publish these account changes for ${String(provider.providerID)}? ${error.message}`))) throw new Error('declined');
+         await client.publishBuilder(builder);
+         continue;
+       }
+       if (Errors.AdditionalKYCNeeded.isInstance(error)) {
+         // With a URL the person must finish a step; without one, review is pending (often under an hour).
+         throw new Error(error.toCompleteFlow ? `the person must finish ${error.toCompleteFlow.url}, then ask again` : 'identity review pending: ask again later');
+       }
+       throw error;
      }
-     else if (Errors.UserActionNeeded.isInstance(error)) {
-       const builder = client.initBuilder();
-       Errors.UserActionNeeded.addOperationsToBuilder(error.actionsNeeded, builder);   // explain, get approval, publish, then retry
-     } else throw error;
    }
+   const { address } = details;
+   // Show the account details exactly as returned; an obfuscated address only has the last digits.
+   if (typeof address !== 'string' && address.type === 'bank-account' && address.accountType === 'us' && !address.obfuscated) {
+     console.log(address.accountOwner, address.routingNumber, address.accountNumber, address.bankName, details.depositMessage);
+   }
+   console.log(details.minimumTransferValue, details.fees);
    ```
 
    - **For ACH,** `details.address` holds `routingNumber`, `accountNumber`, `accountTypeDetail: 'checking'`, an optional `bankName`, and `accountOwner`: the user's legal first and last name, which can't be changed.
@@ -113,7 +133,7 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
    - The user pays from their own bank and includes `depositMessage` exactly.
    - Bridge.xyz has a small minimum (a few dollars). It requires the user to accept its terms of service during KYC (see [complete-kyc](../complete-kyc/SKILL.md)).
 6. **Show the details exactly as returned:** account name, routing number, account number, account type, bank name, and the memo whenever there is one. Never retype or "fix" them.
-7. **Confirm arrival.** Watch the Keeta balance with `client.on('change', …)` or `balance(token)`. For a named account, call `provider.listTransactions({ account, persistentAddresses: [{ location: 'bank-account:us', persistentAddress: details.id }] })`. For a one-time deposit, poll `deposit.getTransferStatus()`.
+7. **Confirm arrival.** Watch the Keeta balance with `client.on('change', …)` or `balance(token)`. For a named account, call `provider.listTransactions({ account, persistentAddresses: [{ location: 'bank-account:us', persistentAddress: details.id }] })`; if `details.id` is missing, watch the balance instead. For a one-time deposit, poll `deposit.getTransferStatus()`.
 
 **Typical timing:** RTP in about a minute, domestic wire within hours, ACH in one to two business days, international wire in one to five business days.
 

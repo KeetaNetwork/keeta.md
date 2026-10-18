@@ -108,7 +108,10 @@ try {
 }
 ```
 
+- This is the default history for wallet agents: it groups blocks into transactions a person recognizes. `client.history()` returns raw vote staples, for low-level reconciliation only.
+- Each row has `id`, `type` (`send`, `receive`, `swap`, `deposit`, `withdraw`, `bridge` or `other`), `status` (`pending`, `complete` or `failed`), `direction` (`in`, `out` or `self`), `timestamp` (ISO string), optional `send`, `receive` and `fee` (each `{ token: 'keeta_…', amount: bigint }`), optional `counterparty` (`{ kind: 'account' | 'anchor' | 'liquidity', id, name? }`, where `id` is the counterparty's address or anchor ID), `legs`, `provisional?`, and `refs` (`blockHashes`, `anchorTxIDs`, `external?`).
 - Amounts are base units of `send.token` or `receive.token`. Format them with that token's decimals, as in the balances script.
+- To read another account, pass its address: `list(address)` here, and `client.allBalances({ account })` or `client.balance(token, { account })` for balances. In code that holds an account object, name its type `import type { GenericAccount } from '@keetanetwork/keetanet-client/lib/account.js'` (or `TokenAddress` for tokens); `KeetaNet.lib.Account` is a value, not a type.
 - `provisional: true` marks a deposit or withdrawal inferred from the anchor reference on the block; check the anchor's transfer status before calling it final.
 - Page with `history.iterate(account, { limit })`, or pass the `cursor` option. For raw blocks, see the `keeta` skill's [transactions reference](../keeta/references/transactions.md).
 
@@ -126,7 +129,7 @@ Take a fresh balance read after the expected transfer, compare it with the read 
 
 - **Empty balance list:** it may be an unfunded account, the wrong network, or a node that can't be reached. Work out which before you act.
 - **Missing or unparseable decimals:** show raw base units only, and don't convert.
-- **Look-alike tokens:** a token that is not in the official list (`officialCurrency === null`) but whose ticker looks like a currency or a well-known asset (`USD`, `USDC`, `EUR`, `KTA`) may be a spoof. Label it unverified, and never treat it as that asset.
+- **Look-alike tokens:** a token that is not in the official list (the script prints `official: 'NOT IN THE NETWORK TOKEN LIST'`) but whose ticker looks like a currency or a well-known asset (`USD`, `USDC`, `EUR`, `KTA`) may be a spoof. Label it unverified, and never treat it as that asset.
 - **Floating point:** never convert `bigint` to `number` for arithmetic on money.
 - **Cached state:** don't claim settlement from a cached UI value. Refresh from the client, and for anchor flows also check the anchor's transfer status.
 

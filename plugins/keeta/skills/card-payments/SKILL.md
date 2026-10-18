@@ -17,7 +17,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
 
 - **Provider:** Bivo Inc. (NMLS #2572288), a licensed money transmitter, provides card transfers on Keeta through Visa Direct. The user completes Bivo onboarding first (KYC, as in [receive-bank-deposits](../receive-bank-deposits/SKILL.md)).
 - **Own cards only:** a linked card belongs to the user's own profile, so pay only cards the user owns. To pay someone else, use [pay-out](../pay-out/SKILL.md) to their bank account, or [send-receive-tokens](../send-receive-tokens/SKILL.md) to their Keeta address.
-- **Who can use it:** individuals onboarded with Bivo, paying their own card. Bivo's newer listing doesn't onboard residents of the EU or Texas.
+- **Who can use it:** individuals onboarded with Bivo, paying their own card. Bivo on test (its newer listing) doesn't onboard residents of the EU or Texas; Bivo on main (its original listing) has no such limit, though its stablecoin conversions still exclude them.
 - **Card currencies** include USD, EUR, GBP, CAD, MXN, JPY, AUD, CNY, HKD, SGD, AED, ILS, DKK, NZD, ZAR, THB, INR and NGN.
 - **Availability** of card rails, currencies and pairs varies by account and network. Discovery shows what this account can use.
 
@@ -32,7 +32,7 @@ Use when money moves between a Keeta balance and **the user's own debit card**:
 
 ## SDK steps
 
-Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver`, `tokenFor` and `decimalsOf`, on the network the user chose (test unless they said main).
 
 1. Confirm that the user has finished onboarding with the provider ([complete-kyc](../complete-kyc/SKILL.md)), the network, and the direction.
 2. Discover providers with card rails:
@@ -48,8 +48,11 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
    if (!provider) throw new Error('card payouts are not available to this account on this network');
 
    // The provider's Keeta USD token, read from its card paths: test and main list different USD tokens.
-   const usdId = provider.serviceInfo.supportedAssets.flatMap(({ paths }) => paths)
-     .flatMap(({ pair: [a, b] }) => a.location === keeta && String(b.location).startsWith('bank-account:') ? [String(a.id)] : [])[0];
+   // A card path ends at `bank-account:card`, or at another bank location whose outbound rails include CARD_PUSH.
+   const paths = provider.serviceInfo.supportedAssets.flatMap((entry) => entry.paths);
+   const pushesToCard = ({ pair: [a, b] }: (typeof paths)[number]) => a.location === keeta && (String(b.location) === 'bank-account:card'
+     || (b.rails.outbound ?? []).some((rail) => (typeof rail === 'string' ? rail : rail.rail) === 'CARD_PUSH'));
+   const usdId = paths.filter(pushesToCard).map(({ pair: [a] }) => String(a.id))[0];   // with several tokens, ask which one
    if (!usdId) throw new Error('this provider lists no Keeta token for card payouts');
    const usdToken = KeetaAnchor.KeetaNet.lib.Account.fromPublicKeyString(usdId).assertKeyType(KeetaAnchor.KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
    ```
@@ -74,6 +77,7 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
    ```ts
    const card = { type: 'persistent-address-template' as const, persistentAddressTemplateId: templateId };
    const pushAsset = { from: usdToken, to: 'EUR' as const };   // the Keeta token you pay from → the card's currency
+   const amount = 50n * 10n ** BigInt(await decimalsOf(usdToken));   // e.g. 50 USD, in usdToken's base units
    const quote = await provider.simulateTransfer({ account, asset: pushAsset, from: { location: keeta }, to: { location: 'bank-account:card' }, value: amount, allowedRails: ['CARD_PUSH'] });
    console.log(quote.instructions.map((i) => [i.type, i.assetFee, i.totalReceiveAmount]));
    const push = await provider.initiateTransfer({
@@ -82,9 +86,8 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
    });
    const send = push.instructions.find((i) => i.type === 'KEETA_SEND');
    if (!send || send.type !== 'KEETA_SEND') throw new Error('no KEETA_SEND instruction');
-   if (send.external === undefined) throw new Error('the instruction has no external reference; pay through AnchorChaining instead (pay-out)');
    // Show the card's last four digits, the amount, fees and estimated amount received; get approval; then:
-   await client.send(send.sendToAddress, BigInt(send.value), send.tokenAddress, send.external);
+   await client.send(send.sendToAddress, BigInt(send.value), send.tokenAddress, send.external);   // pass `external` unchanged when present
    ```
 
 5. **Fund from the card.** Card funding is same-currency: a USD charge credits the Keeta USD token.

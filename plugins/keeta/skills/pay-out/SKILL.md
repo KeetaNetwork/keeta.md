@@ -21,18 +21,18 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
 - **Bivo Inc. (NMLS #2572288)** is a licensed money transmitter. It provides payment accounts and international payments on Keeta. Bivo quotes the FX for local-currency payouts, so the receive amount is an estimate.
 - **Identity:** the sender verifies with the provider first ([complete-kyc](../complete-kyc/SKILL.md)). Bivo and Bridge.xyz serve individual senders; for a business sender, complete [complete-kyb](../complete-kyb/SKILL.md) and use what discovery returns. Recipients can be people or businesses, and need no account and no KYC.
 - **Who can send:**
-  - Bivo's newer listing doesn't onboard residents of the EU or Texas.
+  - Bivo on test (its newer listing) doesn't onboard residents of the EU or Texas; Bivo on main (its original listing) has no such limit, though its stablecoin conversions still exclude them.
   - Bivo's stablecoin conversions aren't available to residents of the EU or Texas.
   - Bridge.xyz needs a US SSN or a national tax ID from a supported country; the UK, Spain, Switzerland, Singapore, Argentina, Colombia and Uruguay aren't supported.
   - Match each option to the principal first: see "Match services to your principal" in the [keeta](../keeta/SKILL.md) skill.
-- **Bivo's Keeta tokens are changing.** On main, Bivo's listing pays from and credits tokens named by currency code: USD, EUR, GBP, CAD, AED, HKD, JPY, MXN and CNY. Bivo is moving them to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`, `$KBGBP`, `$KBCAD`, `$KBMXN`, `$KBJPY` and `$KBAED`, which main's token list already carries. Bivo's newer listing (on test today) uses its own test token, which the token list doesn't name; it adds RTP deposits and card payouts on US accounts, and takes stablecoin deposits through persistent addresses.
+- **Bivo's Keeta tokens are changing.** On main, Bivo's listing pays from and credits tokens named by currency code: USD, EUR, GBP, CAD, AED, HKD, JPY, MXN and CNY. Bivo is moving them to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`, `$KBGBP`, `$KBCAD`, `$KBMXN`, `$KBJPY` and `$KBAED`, which main's token list already carries. Bivo on test (its newer listing) uses its own test token, which the token list doesn't name; it adds RTP deposits and card payouts on US accounts, and takes stablecoin deposits through persistent addresses.
 - **Take Bivo's token from its paths on every run,** never from a ticker. USD, `$KBUSD` and `$KUSD` are three different tokens: `$KUSD` is Keeta's abstract dollar token, which the stablecoin FX anchor converts 1:1 with `$KBUSD` ([convert-via-anchors](../convert-via-anchors/SKILL.md)). A provider accepts only the tokens its paths list, so convert first when the user holds a different one.
 - **Availability** varies by account and network. Discovery returns only what this account can use.
 - To pay a debit card, use [card-payments](../card-payments/SKILL.md). To pay a Keeta address, use [send-receive-tokens](../send-receive-tokens/SKILL.md).
 
 ## SDK steps
 
-Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver` and `tokenFor`, on the network the user chose (test unless they said main).
+Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the steps use its `client`, `account`, signed `resolver`, `tokenFor` and `decimalsOf`, on the network the user chose (test unless they said main).
 
 1. Confirm the network, the source token and its balance (plus KTA for fees), the amount, the recipient's bank details and legal name, and the provider's terms.
 2. Discover providers for the exact corridor:
@@ -59,32 +59,49 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
    const providers = await am.getProvidersForTransfer({ from: keeta, to, rail: 'SPEI_PUSH' }) ?? [];
    for (const p of providers) console.log(String(p.providerID), payoutTokens(p), p.getLegalDisclaimers());
    const provider = providers.find((p) => String(p.providerID) === approvedProviderID);
-   const tokenId = provider ? payoutTokens(provider)[0] : undefined;
-   if (!provider || !tokenId || !(await provider.isOperationSupported('initiateTransfer'))) throw new Error('no payout route for this corridor');
-   const usdToken = KeetaAnchor.KeetaNet.lib.Account.fromPublicKeyString(tokenId).assertKeyType(KeetaAnchor.KeetaNet.lib.Account.AccountKeyAlgorithm.TOKEN);
+   if (!provider || !(await provider.isOperationSupported('initiateTransfer'))) throw new Error('no payout route for this corridor');
+
+   // Pay from a token the provider accepts AND the user holds. During Bivo's move to $KBUSD its paths can list two.
+   const { Account } = KeetaAnchor.KeetaNet.lib;
+   const held = [];
+   for (const id of payoutTokens(provider)) {
+     const token = Account.fromPublicKeyString(id).assertKeyType(Account.AccountKeyAlgorithm.TOKEN);
+     const balance = await client.balance(token);
+     if (balance > 0n) held.push({ token, balance });
+   }
+   if (held.length === 0) throw new Error(`no balance in ${payoutTokens(provider).join(', ')}: fund one first, or pay from another token with the plan below`);
+   const usdToken = held[0].token;                          // with several, ask the user which to spend
+   const amount = 50n * 10n ** BigInt(await decimalsOf(usdToken));   // "50 USD" in the token's base units
+   if (held[0].balance < amount) throw new Error('balance too low for this payout plus fees');
    const asset = { from: usdToken, to: 'MXN' as const };   // → the recipient's currency
    ```
 
-   - Check the balance of `usdToken` itself: a USD token from another issuer, or `$KUSD`, is a different token.
+   - A USD token from another issuer, or `$KUSD`, is a different token: the provider rejects it.
+   - **On test** Bivo's token is credited only by Bivo's own flows (a bank deposit, a card pull or a stablecoin deposit), and the faucet gives only KTA. If this account has none, exercise the payout up to the quote (step 4), or run it on main with the user's approval.
 
    - Use only the locations and rails a provider advertises. Some currencies have several local rails, each at its own location.
    - **No provider for the token you hold?** Let `AnchorChaining` find a route that converts and pays out in one plan (below), or convert first with [convert-via-anchors](../convert-via-anchors/SKILL.md).
-3. Check readiness, and complete only the typed actions, with consent:
+3. Check readiness until the account is ready, completing only the typed actions, with consent:
 
    ```ts
-   if (await provider.isOperationSupported('getAccountStatus')) {
+   for (let round = 0; await provider.isOperationSupported('getAccountStatus'); round++) {
      const readiness = await provider.getAccountStatus({ account });
-     if (readiness.actionRequired) {
-       for (const e of readiness.errors) {
-         if (Errors.KYCShareNeeded.isInstance(e)) { /* share e.neededAttributes with e.shareWithPrincipals (complete-kyc) */ continue; }
-         if (Errors.UserActionNeeded.isInstance(e)) {
-           const builder = client.initBuilder();
-           Errors.UserActionNeeded.addOperationsToBuilder(e.actionsNeeded, builder);   // explain each action, then publish with approval
-           continue;
-         }
-         if (Errors.AdditionalKYCNeeded.isInstance(e) && e.toCompleteFlow) throw new Error(`the person must finish ${e.toCompleteFlow.url}, then retry`);
-         throw e;                                                                         // anything else: stop and report it
+     if (!readiness.actionRequired) break;
+     if (round === 5) throw new Error('still not ready after 5 rounds: report the open items to the user');
+     for (const e of readiness.errors) {
+       if (Errors.KYCShareNeeded.isInstance(e)) { await shareRequestedKYC(e); continue; }   // identity.md's share block, after consent
+       if (Errors.UserActionNeeded.isInstance(e)) {
+         const builder = client.initBuilder();
+         Errors.UserActionNeeded.addOperationsToBuilder(e.actionsNeeded, builder);        // e.g. add the provider's certificate, grant SEND_ON_BEHALF
+         if (!(await askApproval(`Publish these account changes for ${String(provider.providerID)}? ${e.message}`))) throw new Error('declined');
+         await client.publishBuilder(builder);
+         continue;
        }
+       if (Errors.AdditionalKYCNeeded.isInstance(e)) {
+         // With a URL the person must finish a step; without one the provider is reviewing (often under an hour).
+         throw new Error(e.toCompleteFlow ? `the person must finish ${e.toCompleteFlow.url}, then retry` : 'identity review pending: check again later, then retry');
+       }
+       throw e;                                                                             // anything else: stop and report it
      }
    }
    ```
@@ -116,11 +133,10 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
    const instruction = transfer.instructions.find((i) => i.type === 'KEETA_SEND');
    if (!instruction || instruction.type !== 'KEETA_SEND') throw new Error('no KEETA_SEND instruction');
    // Show sendToAddress, tokenAddress, value, assetFee and totalReceiveAmount; get approval; then:
-   if (instruction.external === undefined) throw new Error('no external reference: run this payout through AnchorChaining instead');
    await client.send(instruction.sendToAddress, BigInt(instruction.value), instruction.tokenAddress, instruction.external);
    ```
 
-   The send must carry the provider's `external` value unchanged. Without it, the provider can't match the payment.
+   When the instruction has an `external` value, the send must carry it unchanged: the provider matches the payment by it.
 7. Poll until the payout settles, with a deadline that fits the rail:
 
    ```ts
@@ -154,7 +170,8 @@ Every bank recipient is `{ type: 'bank-account', accountType, …fields, account
 | Canada (bank transfer) | `bank-account:ca` | `CA_PUSH` | `bankCode`, `routingCode`, `bankAccountNumber` |
 | United Arab Emirates | `bank-account:ae` | `AE_PUSH` | `bankAccountNumber` (IBAN), `swiftCode` |
 | India | `bank-account:upi` | `UPI_PUSH` | `upiKey` (`name@bank`), `phoneNumber` (digits) |
-| Other countries | `bank-account:jp`, `bank-account:za`, `bank-account:au`, … | the country's `XX_PUSH` rail | per-country fields: see the `RecipientResolved` type for that `accountType`. Several, such as `jp` and `za`, require `phoneNumber`. |
+| South Africa | `bank-account:za` | `ZA_PUSH` | `bankAccountNumber`, `bankCode`, `email`, `phoneNumber` |
+| Other countries | `bank-account:jp`, `bank-account:au`, … | the country's `XX_PUSH` rail | per-country fields: see the `RecipientResolved` type for that `accountType`. Several, such as `jp`, require `phoneNumber`. |
 
 Local rails also reach Hong Kong, Singapore, Malaysia, Australia, Japan, China, South Korea, the Philippines, Indonesia, Vietnam, Thailand, Nigeria, Kenya, Ghana, Egypt, Türkiye, Israel, Colombia, Argentina, Chile, Peru and others. Discovery lists the current set.
 

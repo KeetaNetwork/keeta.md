@@ -107,6 +107,10 @@ declare global {
 	// Approval prompts the agent shows a human.
 	function tokenFor(ticker: Parameters<InstanceType<typeof KeetaAnchorModule.lib.Resolver>['lookupToken']>[0]): Promise<TokenAddress>;
 	function askApproval(question: string): Promise<boolean>;
+	// keeta quickstart helper: a token's decimals from its metadata.
+	function decimalsOf(token: TokenAddress): Promise<number>;
+	// identity.md's selective-disclosure block wrapped as a function: picks an accepted certificate, gets consent, shares.
+	function shareRequestedKYC(error: InstanceType<typeof AssetMovementErrors.KYCShareNeeded>): Promise<void>;
 	function requestApproval(...details: unknown[]): Promise<boolean>;
 }
 

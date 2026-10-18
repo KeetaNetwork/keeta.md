@@ -16,7 +16,7 @@ Use when an individual's account needs a reusable Keeta KYC certificate, or when
 
 | Provider asking | Typical attributes | Extra step |
 | --- | --- | --- |
-| Bivo (bank accounts, payouts, cards) | name, date of birth, address, phone, email, ID document details. Bivo's newer listing doesn't onboard residents of the EU or Texas. | Review is asynchronous, often under an hour. Then add the provider's certificate and grant `SEND_ON_BEHALF` on Bivo's USD token (read from its paths: USD on main, moving to `$KBUSD`), with approval. |
+| Bivo (bank accounts, payouts, cards) | name, date of birth, address, phone, email, ID document details. Bivo on test (its newer listing) doesn't onboard residents of the EU or Texas; Bivo on main (its original listing) has no such limit, though its stablecoin conversions still exclude them. | Review is asynchronous, often under an hour. Then add the provider's certificate and grant `SEND_ON_BEHALF` on Bivo's USD token (read from its paths: USD on main, moving to `$KBUSD`), with approval. |
 | Bridge.xyz (USDC and EURC bank transfers, other EVM chains) | name, date of birth, address (with state in the US), tax ID (SSN in the US). Tax IDs from the UK, Spain, Switzerland, Singapore, Argentina, Colombia and Uruguay aren't supported. | The person accepts Bridge's terms of service at `tosFlow.url` |
 
 ## SDK steps
@@ -31,8 +31,10 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 
    const kyc = new KeetaAnchor.KYC.Client(client, { resolver });
    const countries = await kyc.getSupportedCountries('individual');      // empty: no KYC provider on this network
+   const country = 'US';                                                  // the person's country from step 1
+   if (!countries.some((c) => c.code === country)) throw new Error(`no KYC provider for ${country} on this network`);
    const providers = await kyc.createVerification({
-     countryCodes: ['US'],
+     countryCodes: [country],
      account,
      entityType: 'individual',
      redirectURL: 'https://example.com/kyc-done'                         // optional
@@ -49,11 +51,21 @@ Run the [keeta quickstart](../keeta/SKILL.md#quickstart-test-network) first: the
 3. Poll with backoff until there is a result:
 
    ```ts
-   const { status } = await verification.getVerificationStatus();  // pass | fail | incomplete | pending | error
-   const certs = await verification.getCertificates();
-   if (!certs.ok) await KeetaAnchor.KeetaNet.lib.Utils.Helper.asleep(certs.retryAfter);
+   const { asleep } = KeetaAnchor.KeetaNet.lib.Utils.Helper;
+   let { status } = await verification.getVerificationStatus();      // pass | fail | incomplete | pending | error
+   for (let wait = 15_000; status === 'pending' || status === 'incomplete'; wait = Math.min(wait * 2, 10 * 60_000)) {
+     await asleep(wait);                                              // `incomplete`: the person hasn't finished the page yet
+     ({ status } = await verification.getVerificationStatus());
+   }
+   if (status !== 'pass') throw new Error(`verification ended with ${status}`);   // fail is final; error: start again
+   let certs = await verification.getCertificates();
+   while (!certs.ok) {                                                // issued shortly after pass
+     await asleep(certs.retryAfter);
+     certs = await verification.getCertificates();
+   }
    ```
 
+   - In an interactive agent, stop polling after a while, tell the person what's pending, and resume later from the saved `providerID` and `id`.
    - `pending` with `requiresManualVerification` means a reviewer is involved, which can take a while.
    - `fail` is final.
 4. Inspect each certificate's issuer, subject, validity and intermediates. Then, **with consent**, attach it on-chain:
