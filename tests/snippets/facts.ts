@@ -46,7 +46,7 @@ for (const network of ['test', 'main'] as const) {
 		const keeta = `chain:keeta:${client.network}` as const;
 		const baseProviders = ((await am.getProvidersForTransfer({ from: stated.base, to: keeta })) ?? []).map((p) => String(p.providerID));
 		// send-receive-tokens resolves usernames across providers; an unknown name must give null, not throw.
-		const usernameProviders = (await within(60, 'username provider lookup', resolver.lookup('username', {})))?.length ?? 0;
+		const usernameProviders = Object.keys((await within(60, 'username provider lookup', resolver.lookup('username', {}))) ?? {}).length;   // lookups are keyed by provider ID
 		const unknownName = await within(60, 'username lookup', new KeetaAnchor.Username.Client(client, { resolver }).resolveMulti(`no-such-user-${Date.now()}`));
 		const tokens = (await resolver.listTokens()).map((t) => `${t.currency}=${t.token}`);
 		console.log(JSON.stringify({ network, kta, usdc, x402Usdc, x402UsdcExists, baseProviders, usernameProviders, tokens }, null, 2));

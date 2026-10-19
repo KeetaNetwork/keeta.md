@@ -121,7 +121,7 @@ try {
       //     and a pending transfer at the Keeta EVM anchor (no value moves); use this mode when that must not happen.
       const paths = await chaining.graph.findPaths(input, { maxPathLength: 3 });
       if (paths.length === 0) console.log(`no route from ${from.publicKeyString.get()} to ${destination.asset} on ${toChain}`);
-      for (const path of paths) console.log('route:', path.map((step) => `${step.type}:${step.providerID}`).join(' > '));
+      for (const name of new Set(paths.map((path) => path.map((step) => `${step.type}:${step.providerID}`).join(' > ')))) console.log('route:', name);   // one line per distinct route
     } else {
       // 3b. Full quotes. A wallet with no balance still gets plans, so quoting is safe on a new wallet.
       const results = await chaining.getPlans(input, { maxPathLength: 3, includeAllOutput: true }) ?? [];
