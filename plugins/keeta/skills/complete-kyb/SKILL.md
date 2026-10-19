@@ -15,7 +15,7 @@ KYB runs through the same `KYC.Client` as individual KYC, with `entityType: 'bus
 The Swift, Rust and C# SDKs don't support `entityType` yet.
 
 - **Provider.** Keeta's KYB provider verifies companies incorporated in exactly one of 33 countries: AE, AT, AU, BE, BR, CA, CH, CN, DE, DK, ES, FI, FR, GB, HK, IE, IN, IT, JP, MX, MY, NL, NO, NZ, PL, PT, SE, SG, TH, TW, US, VN and ZA. It runs on the test network now, and on main where listed: `getSupportedCountries('business')` returns an empty list where no KYB provider is listed.
-- **Who needs it.** Providers that serve businesses ask for organization attributes, such as `organizationName`, `tradeName`, `legalForm`, `email`, `incorporation`, `website` and `entityType`. Bivo and Bridge.xyz bank features serve individuals; for a business, use the providers discovery returns after KYB.
+- **Who needs it.** Providers that serve businesses ask for organization attributes, such as `organizationName`, `tradeName`, `legalForm`, `email`, `incorporation`, `website` and `entityType`. Bivo and Bridge.xyz bank features serve individuals. HopNow's US bank payouts (test network) serve only businesses with a KYB certificate; see [pay-out](../pay-out/SKILL.md). For a business, use the providers discovery returns after KYB.
 
 ## SDK steps
 
