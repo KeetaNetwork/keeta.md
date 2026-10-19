@@ -89,6 +89,7 @@ If the agent runs on its own account and can't read the principal's certificate,
 | OneFootprint (KYC) | Individuals in any country | — | main, test |
 | Keeta KYB | Businesses incorporated in one of 33 countries (listed in [complete-kyb](../complete-kyb/SKILL.md)) | Businesses incorporated elsewhere | test; main once `listSupportedKYCCountries('business')` returns countries there |
 | Bivo: bank accounts, payouts, cards, fiat conversions | Individuals with KYC | Businesses. Residents of the EU and Texas can't use its stablecoin deposits and withdrawals. Bivo's test listing (its newer one) doesn't onboard them at all. | main (Bivo's original listing), test (its newer listing) |
+| HopNow: payouts to US bank accounts from USDC or USDT | Businesses with a Keeta KYB certificate | Individuals, including those with KYC | test |
 | Bridge.xyz: USD and EUR bank transfers, other EVM chains | Individuals with KYC and either a US SSN or a national tax ID from a supported country | Businesses. Tax IDs from the UK, Spain, Switzerland, Singapore, Argentina, Colombia or Uruguay. Regions Bridge declines in its own review. | main, test (USDC only) |
 
 - **The provider's answer is final.** A rejection of the person's region, entity type or tax ID (a `KeetaAnchorUserValidationError` naming the field, or an `OperationNotSupported` error such as `Region not supported: DE`) means stop and offer an alternative from this table. Never retry with different personal details.
@@ -96,7 +97,7 @@ If the agent runs on its own account and can't read the principal's certificate,
   - an EU resident can use Bivo on main (its original listing) for bank accounts and payouts, but not Bivo on test, and Keeta's Base bridge for stablecoins; Bridge.xyz also works with most EU tax IDs, but not Spain's;
   - a Texas resident can use Bivo on main for fiat (not Bivo on test), and Bridge.xyz or Keeta's Base bridge for stablecoins;
   - a UK resident without a US SSN can use Bivo, but not Bridge.xyz;
-  - a business can use payments, x402, Keeta's Base bridge, LayerZero routes and Keeta KYB today; Bivo and Bridge.xyz serve individuals.
+  - a business can use payments, x402, Keeta's Base bridge, LayerZero routes, Keeta KYB and, once verified, HopNow's US payouts (test) today; Bivo and Bridge.xyz serve individuals, and HopNow serves only businesses.
 - Availability also varies by account and network. Discovery returns what this account can use. Bivo's two listings differ by network, not by anything you choose: main has the original listing, test the newer one. A provider that doesn't serve the person's region rejects onboarding with `KeetaAnchorUserValidationError` ([complete-kyc](../complete-kyc/SKILL.md)).
 
 ## Rules
