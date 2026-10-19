@@ -39,6 +39,7 @@ Other sites (keeta.ai, keeta.com) link here with the same commands rather than c
 | [pay-out](plugins/keeta/skills/pay-out/SKILL.md) | Bank payouts in local currency in more than 60 countries, international wires and US ACH, wire and RTP where offered (Bivo); USDC to US banks and EURC by SEPA (Bridge.xyz) |
 | [card-payments](plugins/keeta/skills/card-payments/SKILL.md) | Push to a debit card with Visa Direct, or fund a balance from a card, through Bivo's secure card vault, where available |
 | [bridge-crypto](plugins/keeta/skills/bridge-crypto/SKILL.md) | Move USDC, EURC, cbBTC, KTA and more between Keeta and other chains, and withdraw to Solana: Keeta's Base bridge, Bridge.xyz and LayerZero, chained into one route |
+| [pay-on-other-chains](plugins/keeta/skills/pay-on-other-chains/SKILL.md) | Pay a recipient's 0x… or Solana address in USDC, USDT, ETH and other tokens on Ethereum, Arbitrum, BNB Smart Chain, Polygon, Solana and more, from a Keeta balance, through the Keeta EVM anchor and LayerZero in one plan |
 | [convert-via-anchors](plugins/keeta/skills/convert-via-anchors/SKILL.md) | Convert currencies, stablecoins and tokens with signed quotes, Bivo's fiat conversions and multi-step anchor chaining |
 | [x402-payments](plugins/keeta/skills/x402-payments/SKILL.md) | Pay for, or charge for, API calls per request with x402 on Keeta, with spend controls |
 | [complete-kyc](plugins/keeta/skills/complete-kyc/SKILL.md) | Verify a person once with OneFootprint, attach the certificate, and share only what each provider asks for |

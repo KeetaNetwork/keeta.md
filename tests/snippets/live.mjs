@@ -32,10 +32,17 @@ const EXPECT = {
 		test: [/on: 'chain:evm:84532',\s+to: '0x[0-9a-fA-F]{40}',[^}]*providers: \[ 'evm-anchor' \]/],
 		main: [/on: 'chain:evm:8453'/]
 	},
+	// Keeta USDC to USDC on Arbitrum. Test: LayerZero runs on main only, so there is no route and the script says so.
+	// Main: the routes are listed from metadata alone (KEETA_LIST_ONLY), so CI quotes nothing and creates no
+	// forwarding address at LayerZero; quoting and execution need a confirmed rerun.
+	'pay-on-other-chains': {
+		test: [/no route from keeta_a\w+ to chain:evm:42161 on test/],
+		main: [/can reach on chain:evm:42161: /, /route: assetMovement:\S+ > assetMovement:\S+/]
+	},
 	// facts.ts is not a skill block: it checks the fixed values the skills state, on both networks itself.
 	facts: { test: [/network facts match the skills/] }
 };
-const NETWORK_ENV = { main: { 'deposit-addresses': { KEETA_LIST_ONLY: 'yes' } } };
+const NETWORK_ENV = { main: { 'deposit-addresses': { KEETA_LIST_ONLY: 'yes' }, 'pay-on-other-chains': { KEETA_LIST_ONLY: 'yes' } } };
 
 const tests = [...readdirSync(new URL('./live/', import.meta.url)).filter((name) => name.endsWith('.ts')).sort().map((name) => `live/${name}`), 'facts.ts'];
 let failed = 0;

@@ -17,8 +17,10 @@ Use to pay a person or business at their bank. Every payout starts from a Keeta 
 | US bank account | Bivo | Bivo's Keeta USD token (USD on main, moving to `$KBUSD`) | `bank-account:us` | `ACH`, `WIRE`, and `RTP_PUSH` where offered |
 | US bank account from USDC | Bridge.xyz | Keeta USDC | `bank-account:us` | `ACH`, `WIRE` |
 | Euro IBAN from EURC | Bridge.xyz | Keeta EURC (main network) | `bank-account:iban-swift` | `SEPA_PUSH` |
+| US bank account from USDC or USDT (business sender) | HopNow | Keeta USDC or USDT (the token its paths name) | `bank-account:us` | `ACH`, `RTP_PUSH` |
 
 - **Bivo Inc. (NMLS #2572288)** is a licensed money transmitter. It provides payment accounts and international payments on Keeta. Bivo quotes the FX for local-currency payouts, so the receive amount is an estimate.
+- **HopNow** pays US bank accounts from Keeta USDC or USDT and is for business senders: it accepts a Keeta Business (KYB) certificate from an issuer it trusts ([complete-kyb](../complete-kyb/SKILL.md)), and may return `AdditionalKYCNeeded` with a URL where the certificate's signer accepts HopNow's agreement. Each conversion must be at least 10 USDC or USDT; a smaller deposit waits unconverted. HopNow on test pays out Keeta's test USDC to `bank-account:us` (its only listing today); there is no main listing yet. It quotes with `simulateTransfer`, pays with `initiateTransfer`, and also issues standing payout addresses, so the steps below apply unchanged.
 - **Identity:** the sender verifies with the provider first ([complete-kyc](../complete-kyc/SKILL.md)). Bivo and Bridge.xyz serve individual senders; for a business sender, complete [complete-kyb](../complete-kyb/SKILL.md) and use what discovery returns. Recipients can be people or businesses, and need no account and no KYC.
 - **Who can send:**
   - Bivo on test (its newer listing) doesn't onboard residents of the EU or Texas; Bivo on main (its original listing) has no such limit, though its stablecoin conversions still exclude them.
@@ -219,6 +221,7 @@ await chosen.execute({ requireSendAuth: true });   // run it once
 ## Failures
 
 - **No provider, or no provider supporting `initiateTransfer`:** that corridor isn't available to this account on this network. Stop and report it.
+- **HopNow below 10 USDC or USDT, or a certificate it doesn't trust:** raise the amount, or complete KYB with an accepted issuer; HopNow doesn't onboard individuals.
 - **`KYCShareNeeded`, `AdditionalKYCNeeded` or `UserActionNeeded`:** complete only the typed action, with consent, then retry.
 - **Region not supported:** relay the provider's message. Don't work around it.
 - **Validation error:** `KeetaAnchorUserValidationError` lists the bad fields in `error.fields`, including any minimum in `valueRules.minimum`. Fix the recipient or the amount. The amount must also cover fees.

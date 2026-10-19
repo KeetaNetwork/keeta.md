@@ -15,13 +15,14 @@ Use for an on-chain conversion once the exact source and destination assets are 
 | KTA ↔ USDC (main) and other token pairs | FX anchors | `FX.Client`: signed quotes, then `createExchange()` |
 | USD ↔ EUR, GBP, CAD, MXN, JPY, AED, HKD, CNY (Bivo's Keeta fiat tokens, moving to `$KBUSD`, `$KBEUR` and the other `$KB` tokens) | Bivo | Asset-movement transfers on Keeta, which anchor chaining plans for you |
 | An issuer's stablecoin ↔ Keeta's abstract currency token, 1:1 (`$KBUSD` ↔ `$KUSD`, `$KBEUR` ↔ `$KEUR`…) | Keeta's stablecoin FX anchor (main) | `FX.Client`; one issuer's stablecoin to another's is two hops through the abstract token, which chaining plans |
+| An FX pair in the middle of a chain | Keeta's asset-movement FX proxy, where discovery lists it | Serves Anchor FX as a Keeta-to-Keeta asset-movement step, so chaining can convert at any step, not only first |
 | Tokens on other chains, such as USDT0 to USDC | LayerZero | See [bridge-crypto](../bridge-crypto/SKILL.md) |
 
 - **The simplest path for any pair is anchor chaining** (step 6): one call finds every route across FX anchors and asset-movement conversions, so you can compare plans.
 - **Bivo's fiat conversions are forward-quoted:** you fix the amount you send, and the amount received is an estimate. They need Bivo onboarding (individuals with KYC; see [receive-bank-deposits](../receive-bank-deposits/SKILL.md)).
 - **`$K` and `$KB` tokens.** `$KUSD`, `$KEUR` and the other `$K` tokens are Keeta's abstract currency tokens, one per currency. `$KBUSD`, `$KBEUR` and the other `$KB` tokens are Bivo's stablecoins. The stablecoin FX anchor converts each issuer's stablecoin 1:1 with its currency's abstract token, scaling base units when decimals differ; any fee shows in the quote's `cost`. On main, CI checks `$KBUSD` ↔ `$KUSD` daily. Test lists `$KUSD` and `$KEUR` but no `$KB` tokens yet.
 - **Token addresses** come from `resolver.listTokens()` (the network's currency map) or a provider's paths. Never copy them from an example for main.
-- **Checked corridors:** on main, KTA → USDC through an FX anchor and `$KBUSD` ↔ `$KUSD` through the stablecoin FX anchor (CI checks both daily); on test, KTA converts only into demo tokens. These don't prove a provider is available to this account right now, so always discover at run time.
+- **Checked corridors:** on main, KTA → USDC through an FX anchor and `$KBUSD` ↔ `$KUSD` through the stablecoin FX anchor (CI checks both daily); main also lists `@pricing`, which gives estimates only. On test, KTA converts only into demo tokens. These don't prove a provider is available to this account right now, so always discover at run time.
 
 ## SDK steps
 
@@ -202,6 +203,7 @@ The steps below show the same flow one client at a time, for when you need a sin
 
    - `event.markCompleted({ sent: false })` approves the send, and the plan then publishes it. Never publish it yourself as well, or it is paid twice.
    - Plans are **not atomic**, so never re-execute one. If a step fails, `execute()` throws that step's error, and `plan.state` holds `status: 'failed'`, `completedSteps` and `failedAtStepIndex` (the same values reach `plan.on('failed', …)`). Reconcile balances, then plan only the remaining leg.
+   - **The FX proxy inside a plan.** Anchor FX is synchronous and signed by the user's own account, so chaining can use a plain FX step only first. Keeta's asset-movement FX proxy advertises the same FX pairs (those priced from the source amount, with no KYC) as Keeta-to-Keeta asset-movement paths: the plan sends the source token to the proxy, which swaps it and forwards the destination token, so a conversion can sit at any step, for example USDC → `$KUSD` → `$KBUSD` → a bank payout. It appears in a plan as an `assetMovement` step with the proxy's `providerID`; its `simulateTransfer` and `initiateTransfer` return the net output, cached for 30 seconds so they agree. **A failure there is not refunded automatically:** the proxy never returns a deposit on its own, because the sender may be an exchange or another anchor that can't attribute a refund, so if no offer covers the deposit within 10 minutes, or anything fails later, the funds stay on the proxy account for an operator. Report the step, the transfer id and the status, and don't retry or resend.
 
 ## Confirmations
 
@@ -216,6 +218,7 @@ The steps below show the same flow one client at a time, for when you need a sin
 - **Unknown decimals:** a token without metadata has no decimals to read. Show its amounts as base units, say so, and never guess a scale.
 - **Ambiguous status:** poll `getExchangeStatus()` and check balances. Never create a second exchange blindly.
 - **Chaining failure:** `execute()` throws, and `plan.state` holds `completedSteps` and `failedAtStepIndex`. Reconcile, then plan only the remaining leg.
+- **FX proxy step failed:** nothing is refunded automatically; the funds stay with the proxy for an operator. Report the step and transfer, and don't retry.
 - **Unknown endpoints:** never replace an unavailable provider with an endpoint you haven't reviewed.
 
 ## Related skills
@@ -223,7 +226,7 @@ The steps below show the same flow one client at a time, for when you need a sin
 - Inspect provider metadata with [discover-resolve-anchors](../discover-resolve-anchors/SKILL.md).
 - Reconcile with [multi-asset-balances](../multi-asset-balances/SKILL.md).
 - Apply [spend-policy](../spend-policy/SKILL.md) before you execute.
-- Pay out the converted funds to a bank with [pay-out](../pay-out/SKILL.md).
+- Pay out the converted funds to a bank with [pay-out](../pay-out/SKILL.md), or to an address on another chain with [pay-on-other-chains](../pay-on-other-chains/SKILL.md).
 - For everything else, start at the [keeta](../keeta/SKILL.md) skill.
 
 ## Sources

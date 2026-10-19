@@ -40,7 +40,7 @@ Which providers appear varies by account and network. Who may use each one (indi
    - `assetMovement.getProvidersForTransfer({ asset, from, to })`, then `provider.isOperationSupported('initiateTransfer' | 'createPersistentForwarding')`
    - `fx.listPossibleConversions({ from })`, `fx.getQuotes(...)` and `fx.getEstimates(...)`
    - `kyc.getSupportedCountries('individual' | 'business')` and `kyc.createVerification(...)`
-   - `new KeetaAnchor.Username.Client(client, { resolver }).resolve(...)` (no username provider is listed on test or main today, so it returns `null`), the storage client (deep import), and `new KeetaAnchor.Notification.Client(client, { resolver }).getProviders(...)`
+   - `new KeetaAnchor.Username.Client(client, { resolver }).resolveMulti(...)` (both networks list a username provider today; an unknown name returns `null`), the storage client (deep import), and `new KeetaAnchor.Notification.Client(client, { resolver }).getProviders(...)`
 3. For generic discovery, or to inspect what a network offers, use the same resolver directly. Currency codes such as `'USD'` exist on main only; the test network's tickers are `$KTA`, `$USDC`, `$EURC`, `$CBBTC`, `$KUSD`, `$KEUR` and `$RUSD`, so read `listTokens()` first:
 
    ```ts

@@ -24,6 +24,7 @@ EXPECTED_SKILLS = {
     "create-fund-wallet",
     "discover-resolve-anchors",
     "multi-asset-balances",
+    "pay-on-other-chains",
     "pay-out",
     "receive-bank-deposits",
     "send-receive-tokens",

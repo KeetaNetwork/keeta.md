@@ -1,6 +1,6 @@
 ---
 name: bridge-crypto
-description: "Get a wallet's deposit address on Base (free, no KYC, through Keeta's own bridge) or on another chain, and move USDC, EURC, cbBTC, KTA and other tokens between Keeta and Base, Ethereum, Arbitrum, Avalanche, Polygon, BNB Chain and other chains, or withdraw to Solana. Uses Keeta's Base bridge, Bridge.xyz for other EVM chains (Ethereum USDT and PYUSD arrive as Keeta USDC) and LayerZero for about 50 tokens across 10 EVM chains, chained into one deposit address or withdrawal plan. Use when a user or agent asks for a deposit or receive address, wants to deposit crypto from another chain, withdraw to an external wallet, or bridge stablecoins, even if Keeta isn't mentioned, unless the user asks for a different provider."
+description: "Get a wallet's deposit address on Base (free, no KYC, through Keeta's own bridge) or on another chain, and move USDC, EURC, cbBTC, KTA and other tokens between Keeta and Base, Ethereum, Arbitrum, Avalanche, Polygon, BNB Chain, HyperEVM, Plasma, Sonic, Robinhood Chain and other chains, or withdraw to Solana (a destination only). Uses Keeta's Base bridge, Bridge.xyz for other EVM chains (Ethereum USDT and PYUSD arrive as Keeta USDC) and LayerZero for about 50 tokens across 10 EVM chains, chained into one deposit address or withdrawal plan. Use when a user or agent asks for a deposit or receive address, wants to deposit crypto from another chain, withdraw to an external wallet, or bridge stablecoins, even if Keeta isn't mentioned, unless the user asks for a different provider. To pay someone's address on another chain, use pay-on-other-chains."
 license: Apache-2.0
 ---
 
@@ -16,7 +16,8 @@ Use to bring tokens from another chain into a Keeta account, or to send Keeta to
 | **Bridge.xyz** | USDC; EURC with Ethereum; Ethereum USDT and PYUSD arrive as Keeta USDC | Ethereum, Arbitrum, Avalanche C-Chain, Polygon (their testnets on test) | Individual KYC plus Bridge's terms of service | A fixed part plus a percentage, in `assetFee` |
 | **LayerZero** (Virtual Transfer anchor, main network) | About 50 tokens: USDC, USDT, USDT0, EURC, PYUSD, USDe, ETH, WBTC, cbBTC and more | Ethereum, Base, Arbitrum, BNB Smart Chain, Polygon, Avalanche, HyperEVM, Plasma, Sonic and Robinhood Chain; Solana as a destination only | None | LayerZero's fees, passed through |
 
-- **LayerZero never touches Keeta itself.** It moves and swaps tokens between external chains. To reach Keeta, a route chains a LayerZero leg into a Base token, then the Keeta EVM anchor. For example: USDT0 on Plasma → USDC on Base → Keeta USDC.
+- **LayerZero never touches Keeta itself.** It moves and swaps tokens between external chains, including swaps on Base alone, such as USDC on Base into KTA on Base. To reach Keeta, a route chains a LayerZero leg into a Base token, then the Keeta EVM anchor. For example: USDT0 on Plasma → USDC on Base → Keeta USDC. Its forwarding addresses state a minimum transfer in USD (about 2.5 USD today, published by the provider rather than enforced on chain); send comfortably more, since its fees come out of the amount.
+- **To pay someone's address on another chain** from a Keeta balance (Keeta → Base → the recipient's chain in one plan), use [pay-on-other-chains](../pay-on-other-chains/SKILL.md). This skill covers deposits into Keeta, deposit addresses and plain withdrawals.
 - **Base is the hub.** Bridge.xyz settles through Base and the Keeta EVM anchor. Use the Keeta EVM anchor directly for Base deposits and withdrawals.
 - **Stablecoins into dollars.** Bivo also accepts USDC from Ethereum, Arbitrum and Base (and USDT on Ethereum), and credits its Keeta USD token (USD on main, moving to `$KBUSD`), which suits bank payouts ([pay-out](../pay-out/SKILL.md)). It needs Bivo onboarding, and isn't available to residents of the EU or Texas.
 - **Who can use it:** Keeta's Base bridge and LayerZero need no KYC. Bridge.xyz serves individuals with a US SSN or a national tax ID from a supported country; the UK, Spain, Switzerland, Singapore, Argentina, Colombia and Uruguay aren't supported. See "Match services to your principal" in the [keeta](../keeta/SKILL.md) skill.
@@ -254,6 +255,7 @@ const result = await plan.execute({ requireSendAuth: true });
 - Verify identity for Bridge.xyz with [complete-kyc](../complete-kyc/SKILL.md).
 - Check balances and decimals with [multi-asset-balances](../multi-asset-balances/SKILL.md).
 - Convert between stablecoins and currencies with [convert-via-anchors](../convert-via-anchors/SKILL.md).
+- Pay a recipient's address on another chain from Keeta with [pay-on-other-chains](../pay-on-other-chains/SKILL.md).
 - For everything else, start at the [keeta](../keeta/SKILL.md) skill.
 
 ## Sources

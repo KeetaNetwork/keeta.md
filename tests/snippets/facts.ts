@@ -99,8 +99,8 @@ for (const network of ['test', 'main'] as const) {
 		const x402Resolved = await within(60, 'getUsdcAddress', getUsdcAddress(network === 'test' ? KEETA_TESTNET_CAIP2 : KEETA_MAINNET_CAIP2));
 		if (x402Resolved !== usdc) problems.push(`${network}: getUsdcAddress is ${x402Resolved}, resolver $USDC is ${usdc}`);
 		if (network === 'main' && x402Usdc !== usdc) problems.push(`main: @x402/keeta USDC ${x402Usdc} differs from the resolver's ${usdc}`);
-		// send-receive-tokens says neither network lists a username provider yet.
-		if (usernameProviders !== 0) problems.push(`${network}: ${usernameProviders} username provider(s) now listed; update send-receive-tokens`);
+		// send-receive-tokens resolves usernames through a provider discovered at run time, so each network must list one.
+		if (usernameProviders === 0) problems.push(`${network}: no username provider listed; update send-receive-tokens`);
 		if (unknownName !== null) problems.push(`${network}: an unknown username resolved to ${JSON.stringify(unknownName)}`);
 		if (!baseProviders.includes(stated.bridgeProvider)) problems.push(`${network}: Base providers are ${baseProviders.join(', ')}, skills name ${stated.bridgeProvider}`);
 	} finally {
