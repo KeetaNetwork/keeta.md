@@ -87,6 +87,10 @@ jobs:
   trials:
     name: Agent trials
     runs-on: ubuntu-latest
+    # One run at a time: the funded main trial reads balance changes on a shared account.
+    concurrency:
+      group: agent-trials-main-account
+      cancel-in-progress: false
     defaults:
       run:
         working-directory: tests/snippets
@@ -98,5 +102,8 @@ jobs:
           cache: npm
           cache-dependency-path: tests/snippets/package-lock.json
       - run: npm ci
-      - name: Run the programs agents wrote from the skills, on test (funded) and main (read-only)
+      - name: Run the programs agents wrote from the skills, on test (funded) and main (read-only, plus funded when the secret is set)
         run: npm run trials
+        env:
+          # A dedicated main account holding a few KTA; never a personal or treasury seed. Absent on fork PRs.
+          KEETA_MAIN_TRIAL_SEED: ${{ secrets.KEETA_MAIN_TRIAL_SEED }}

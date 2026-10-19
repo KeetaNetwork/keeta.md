@@ -19,15 +19,16 @@ Anchors are off-chain services that connect Keeta to the outside world. They pub
 | --- | --- | --- | --- | --- |
 | **Bivo** (Bivo Inc., NMLS #2572288, licensed money transmitter) | asset movement | Named US bank accounts (ACH) in the user's name; wire, RTP and SWIFT deposit instructions; payouts in local currency in more than 60 countries; international wires; conversions between its Keeta fiat tokens (USD, EUR… on main, moving to the Keeta Bivo stablecoins `$KBUSD`, `$KBEUR`…); Visa Direct card push and pull | main, test | Individual KYC |
 | **Bridge.xyz** | asset movement | USD by ACH or wire to and from US accounts against Keeta USDC; EUR by SEPA from Keeta EURC; USDC with Ethereum, Arbitrum, Avalanche and Polygon; Ethereum USDT and PYUSD into Keeta USDC | main, test (USDC only) | Individual KYC plus Bridge's terms of service |
+| **HopNow** | asset movement | Payouts to US bank accounts (ACH, RTP) from Keeta USDC or USDT, with a 10 USDC minimum per conversion; outbound only | test (Keeta test USDC → `bank-account:us`); no main listing yet | A Keeta Business (KYB) certificate from an issuer HopNow trusts, plus HopNow's agreement where it asks |
 | **Keeta EVM anchor** | asset movement | Keeta's own bridge with Base for KTA, USDC, EURC and cbBTC, with no bridge fee | main (Base), test (Base Sepolia) | None |
-| **LayerZero** (Virtual Transfer anchor) | asset movement | Bridges and swaps about 50 tokens across 10 EVM chains, with Solana as a destination. It never touches Keeta, so routes chain it with the Keeta EVM anchor through Base. | main | None |
+| **LayerZero** (Virtual Transfer anchor) | asset movement | Bridges and swaps about 50 tokens between Base and Ethereum, Arbitrum, BNB Smart Chain, Polygon, Avalanche, HyperEVM and Sonic (Plasma and Robinhood Chain are configured but weren't listed when CI last checked), with Solana as a destination. It never touches Keeta, so routes chain it with the Keeta EVM anchor through Base. | main | None |
 | **OneFootprint** | KYC | Hosted identity verification that issues a reusable Keeta KYC certificate | main, test | — |
 | **Keeta KYB provider** | KYC (`entityType: 'business'`) | Business verification for companies incorporated in 33 countries | test; main once `resolver.listSupportedKYCCountries('business')` returns countries there | — |
 | **Stablecoin FX anchor** | FX | 1:1 conversions between an issuer's stablecoin and Keeta's abstract currency token (`$KBUSD` ↔ `$KUSD`, `$KBEUR` ↔ `$KEUR`…); one issuer to another chains two legs | main | None |
 
 Who may use each provider (individuals or businesses, and regional limits) is in "Match services to your principal" in [SKILL.md](../SKILL.md).
 
-Workflows: [receive-bank-deposits](../../receive-bank-deposits/SKILL.md), [pay-out](../../pay-out/SKILL.md), [card-payments](../../card-payments/SKILL.md), [bridge-crypto](../../bridge-crypto/SKILL.md), [convert-via-anchors](../../convert-via-anchors/SKILL.md), [complete-kyc](../../complete-kyc/SKILL.md) and [complete-kyb](../../complete-kyb/SKILL.md).
+Workflows: [receive-bank-deposits](../../receive-bank-deposits/SKILL.md), [pay-out](../../pay-out/SKILL.md), [card-payments](../../card-payments/SKILL.md), [bridge-crypto](../../bridge-crypto/SKILL.md), [pay-on-other-chains](../../pay-on-other-chains/SKILL.md), [convert-via-anchors](../../convert-via-anchors/SKILL.md), [complete-kyc](../../complete-kyc/SKILL.md) and [complete-kyb](../../complete-kyb/SKILL.md).
 
 ## Discover
 
@@ -135,7 +136,7 @@ Use the [complete-kyc](../../complete-kyc/SKILL.md) skill for a person and [comp
 
 ## Usernames
 
-No username provider is listed on test or main today (CI checks this daily), so `resolve` and `resolveMulti` return `null`. Ask for the `keeta_…` address instead. The calls below are ready for when one is listed:
+Test and main each list a username provider today (CI checks this daily). Discover it at run time with `usernames.resolver.lookup('username', {})` rather than naming it, since listings change. `resolveMulti` searches every listed provider and returns `null` for an unknown name: then ask for the `keeta_…` address instead.
 
 ```ts
 const usernames = new KeetaAnchor.Username.Client(client, { resolver });
@@ -145,7 +146,7 @@ const mine = await usernames.resolveMulti(client.account);         // account �
 const claimed = await usernames.claimUsername('alice$exampleprovider');
 ```
 
-- Always use the full `name$providerID` form for payments, and confirm the resolved address with the user before you send to it.
+- Always use the full `name$providerID` form for payments, show the resolved `keeta_…` address, and confirm it with the user before you send to it.
 - Each provider publishes a pattern (`provider.usernamePattern`, `provider.isUsernameValid(name)`). Lowercase the input yourself.
 - To list providers, call `usernames.resolver.lookup('username', {})`.
 - A provider may require a certificate before you can claim a name, and may allow only one name per account.

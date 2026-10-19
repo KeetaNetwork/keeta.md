@@ -46,7 +46,7 @@ for (const network of ['test', 'main'] as const) {
 		const keeta = `chain:keeta:${client.network}` as const;
 		const baseProviders = ((await am.getProvidersForTransfer({ from: stated.base, to: keeta })) ?? []).map((p) => String(p.providerID));
 		// send-receive-tokens resolves usernames across providers; an unknown name must give null, not throw.
-		const usernameProviders = (await within(60, 'username provider lookup', resolver.lookup('username', {})))?.length ?? 0;
+		const usernameProviders = Object.keys((await within(60, 'username provider lookup', resolver.lookup('username', {}))) ?? {}).length;   // lookups are keyed by provider ID
 		const unknownName = await within(60, 'username lookup', new KeetaAnchor.Username.Client(client, { resolver }).resolveMulti(`no-such-user-${Date.now()}`));
 		const tokens = (await resolver.listTokens()).map((t) => `${t.currency}=${t.token}`);
 		console.log(JSON.stringify({ network, kta, usdc, x402Usdc, x402UsdcExists, baseProviders, usernameProviders, tokens }, null, 2));
@@ -99,8 +99,8 @@ for (const network of ['test', 'main'] as const) {
 		const x402Resolved = await within(60, 'getUsdcAddress', getUsdcAddress(network === 'test' ? KEETA_TESTNET_CAIP2 : KEETA_MAINNET_CAIP2));
 		if (x402Resolved !== usdc) problems.push(`${network}: getUsdcAddress is ${x402Resolved}, resolver $USDC is ${usdc}`);
 		if (network === 'main' && x402Usdc !== usdc) problems.push(`main: @x402/keeta USDC ${x402Usdc} differs from the resolver's ${usdc}`);
-		// send-receive-tokens says neither network lists a username provider yet.
-		if (usernameProviders !== 0) problems.push(`${network}: ${usernameProviders} username provider(s) now listed; update send-receive-tokens`);
+		// send-receive-tokens resolves usernames through a provider discovered at run time, so each network must list one.
+		if (usernameProviders === 0) problems.push(`${network}: no username provider listed; update send-receive-tokens`);
 		if (unknownName !== null) problems.push(`${network}: an unknown username resolved to ${JSON.stringify(unknownName)}`);
 		if (!baseProviders.includes(stated.bridgeProvider)) problems.push(`${network}: Base providers are ${baseProviders.join(', ')}, skills name ${stated.bridgeProvider}`);
 	} finally {
