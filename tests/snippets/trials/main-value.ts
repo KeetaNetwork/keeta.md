@@ -3,9 +3,10 @@
 // KEETA_MAIN_TRIAL_SEED secret (skipped when the secret is absent, as on fork pull requests).
 // Built from the skills: send-receive-tokens (send, verify), convert-via-anchors (swap script with route
 // and minimum receive) and multi-asset-balances. The user's requests stand in as:
-//   "Send 0.01 KTA to my other account and have it send half back."
+//   "Send 0.01 KTA to my other account and have it send it all back."
 //   "Swap 0.5 KTA to USDC, then swap the USDC back to KTA."
-// Guard: the run fails if the account ends more than MAX_LOSS KTA poorer than it started.
+// Guards: the send round trip must end exactly where it started less the two network fees, and the
+// whole run fails if the account ends more than MAX_LOSS KTA poorer (the swaps add the provider's spread).
 import * as KeetaNet from '@keetanetwork/keetanet-client';
 import * as KeetaAnchor from '@keetanetwork/anchor';
 import { getDefaultResolverConfig } from '@keetanetwork/anchor/config.js';
@@ -150,19 +151,25 @@ try {
     process.exit(1);
   }
 
-  step('send 0.01 KTA to the other account, and half back');
+  step('send 0.01 KTA to the other account and all of it back');
+  // The round trip must end where it started, less the KTA network fee on each send.
   const sendValue = toBaseUnits('0.01', ktaDecimals);
   const otherBefore = await otherClient.balance(kta);
-  const sent = await client.send(other, sendValue, kta);
-  console.log('sent; published:', sent);
+  await client.send(other, sendValue, kta);
   const otherAfter = await waitForChange(() => otherClient.balance(kta), otherBefore, 'other account balance');
-  console.log(`other account: ${format(otherBefore, ktaDecimals)} -> ${format(otherAfter, ktaDecimals)} KTA`);
   if (otherAfter - otherBefore !== sendValue) throw new Error(`other account received ${otherAfter - otherBefore}, expected ${sendValue}`);
-  const mineBefore = await client.balance(kta);
-  await otherClient.send(account, sendValue / 2n, kta);
-  const mineAfter = await waitForChange(() => client.balance(kta), mineBefore, 'balance after the send back');
-  if (mineAfter - mineBefore !== sendValue / 2n) throw new Error(`got back ${mineAfter - mineBefore}, expected ${sendValue / 2n}`);
-  console.log('got 0.005 KTA back');
+  const afterSend = await client.balance(kta);
+  const fee = startKta - afterSend - sendValue;   // the network fee the send published
+  console.log(`other account received 0.01 KTA; network fee ${fee} base units`);
+  if (fee < 0n || fee > toBaseUnits('0.001', ktaDecimals)) throw new Error(`implausible network fee ${fee}`);
+  // The other account returns everything it holds (including dust from earlier runs) less its own fee.
+  await otherClient.send(account, otherAfter - fee, kta);
+  const returned = await waitForChange(() => client.balance(kta), afterSend, 'balance after the send back');
+  const otherLeft = await otherClient.balance(kta);
+  const expected = startKta + otherBefore - 2n * fee;
+  console.log(`KTA ${format(startKta, ktaDecimals)} -> ${format(returned, ktaDecimals)}; other account left with ${otherLeft} base units`);
+  if (returned !== expected || otherLeft !== 0n) throw new Error(`round trip ended at ${returned} (other ${otherLeft}), expected ${expected} (other 0): it lost more than the two network fees`);
+  const transferCost = startKta - returned;
 
   step('swap 0.5 KTA to USDC and back');
   const usdc = await tokenFor('$USDC');
@@ -173,10 +180,11 @@ try {
 
   step('cost');
   const endKta = await client.balance(kta);
+  const swapCost = returned - endKta;   // network fees plus the provider's spread on both legs
   const cost = startKta - endKta;
-  console.log(`KTA ${format(startKta, ktaDecimals)} -> ${format(endKta, ktaDecimals)}: the run cost ${format(cost, ktaDecimals)} KTA`);
+  console.log(`KTA ${format(startKta, ktaDecimals)} -> ${format(endKta, ktaDecimals)}: transfers cost ${format(transferCost, ktaDecimals)} (network fees only), swaps cost ${format(swapCost, ktaDecimals)} (fees and spread)`);
   if (cost > toBaseUnits(MAX_LOSS, ktaDecimals)) throw new Error(`the run cost ${format(cost, ktaDecimals)} KTA, more than ${MAX_LOSS}`);
-  console.log(`RESULT: On main, sent 0.01 KTA to a second account and got 0.005 back, swapped 0.5 KTA into ${format(gotUsdc, usdcDecimals)} USDC and back into ${format(gotKta, ktaDecimals)} KTA; the run cost ${format(cost, ktaDecimals)} KTA in fees and spread. ${explorer}/account/${account.publicKeyString.get()}`);
+  console.log(`RESULT: On main, sent 0.01 KTA to a second account and got it all back less two network fees (${format(transferCost, ktaDecimals)} KTA), then swapped 0.5 KTA into ${format(gotUsdc, usdcDecimals)} USDC and back into ${format(gotKta, ktaDecimals)} KTA at a cost of ${format(swapCost, ktaDecimals)} KTA. ${explorer}/account/${account.publicKeyString.get()}`);
 } finally {
   await client.destroy();
   await otherClient.destroy();
