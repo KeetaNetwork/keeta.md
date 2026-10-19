@@ -176,7 +176,8 @@ try {
   const usdcDecimals = await decimalsOf(usdc);
   const chaining = new AnchorChaining({ client, resolver });
   const gotUsdc = await swap(chaining, kta, usdc, toBaseUnits('0.5', ktaDecimals), ktaDecimals, usdcDecimals);
-  const gotKta = await swap(chaining, usdc, kta, gotUsdc, usdcDecimals, ktaDecimals);
+  // Convert the whole USDC balance back, so USDC a failed earlier run left behind is recovered too.
+  const gotKta = await swap(chaining, usdc, kta, await client.balance(usdc), usdcDecimals, ktaDecimals);
 
   step('cost');
   const endKta = await client.balance(kta);
