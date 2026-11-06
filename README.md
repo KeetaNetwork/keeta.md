@@ -25,7 +25,7 @@ Agent Skills for moving money with Keeta Network, hosted at <https://keeta-md.pa
 
 Don't use `npx skills add https://keeta-md.pages.dev/SKILL.md`: the CLI rejects path-scoped URLs on a site that publishes a discovery index.
 
-Other sites (keeta.ai, keeta.com) link here with the same commands rather than copying the skills.
+Other sites (keeta.com) link here with the same commands rather than copying the skills.
 
 ## Skills
 

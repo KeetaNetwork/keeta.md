@@ -141,7 +141,6 @@ def llms_index(ordered: list[tuple[str, str]]) -> str:
         "## Optional",
         "",
         f"- [Source on GitHub]({GITHUB_URL})",
-        "- [Keeta Compute: AI inference paid with Keeta stablecoins](https://keeta.ai/llms.txt)",
         "- [Keeta Network docs](https://docs.keeta.com/)",
         "",
     ]
