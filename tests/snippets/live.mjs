@@ -54,24 +54,29 @@ for (const file of tests) {
 		runs++;
 		const seed = KeetaNet.lib.Account.generateRandomSeed({ asString: true });
 		const started = Date.now();
-		const run = spawnSync('npx', ['tsx', file], {
-			cwd: new URL('.', import.meta.url),
-			env: { ...process.env, KEETA_NETWORK: network, KEETA_SEED: seed, ...NETWORK_ENV[network]?.[name] },
-			encoding: 'utf-8',
-			timeout: 5 * 60_000
-		});
-		const output = `${run.stdout ?? ''}${run.stderr ?? ''}`;
 		const expected = EXPECT[name]?.[network];
-		const problems = [];
-		if (run.status !== 0) problems.push(`exited with ${run.status ?? run.signal}`);
-		if (!expected) problems.push('no expectation in live.mjs');
-		for (const pattern of expected ?? []) {
-			if (!pattern.test(run.stdout ?? '')) problems.push(`output does not match ${pattern}`);
-		}
 		const label = `${name} on ${network}`;
-		console.log(`::group::${label} (${Math.round((Date.now() - started) / 1000)} s)`);
-		console.log(output);
-		console.log('::endgroup::');
+		let problems = [];
+		// The routes come from live providers, so a failed run is retried once (same wallet) before it counts.
+		for (let attempt = 1; attempt <= 2; attempt++) {
+			const run = spawnSync('npx', ['tsx', file], {
+				cwd: new URL('.', import.meta.url),
+				env: { ...process.env, KEETA_NETWORK: network, KEETA_SEED: seed, ...NETWORK_ENV[network]?.[name] },
+				encoding: 'utf-8',
+				timeout: 5 * 60_000
+			});
+			problems = [];
+			if (run.status !== 0) problems.push(`exited with ${run.status ?? run.signal}`);
+			if (!expected) problems.push('no expectation in live.mjs');
+			for (const pattern of expected ?? []) {
+				if (!pattern.test(run.stdout ?? '')) problems.push(`output does not match ${pattern}`);
+			}
+			console.log(`::group::${label}, attempt ${attempt} (${Math.round((Date.now() - started) / 1000)} s)`);
+			console.log(`${run.stdout ?? ''}${run.stderr ?? ''}`);
+			console.log('::endgroup::');
+			if (!problems.length || !expected) break;
+			console.log(`attempt ${attempt} of ${label} failed: ${problems.join('; ')}`);
+		}
 		if (problems.length) {
 			failed++;
 			console.log(`FAIL ${label}: ${problems.join('; ')}`);
