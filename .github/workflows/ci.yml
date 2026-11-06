@@ -34,7 +34,7 @@ jobs:
         run: grep -qx 'pages_build_output_dir = "./_site"' wrangler.toml
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "^22.23.4" # CVE-2026-111497 (node2shell) is fixed in 22.23.4
       - name: Serve the build as Pages does, and install every skill from it with the skills CLI
         env:
           DISABLE_TELEMETRY: "1"
@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "^24.22.1" # CVE-2026-111497 (node2shell) is fixed in 24.22.1
           cache: npm
           cache-dependency-path: tests/snippets/package-lock.json
       - run: npm ci
@@ -77,7 +77,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "^24.22.1" # CVE-2026-111497 (node2shell) is fixed in 24.22.1
           cache: npm
           cache-dependency-path: tests/snippets/package-lock.json
       - run: npm ci
@@ -98,7 +98,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "^24.22.1" # CVE-2026-111497 (node2shell) is fixed in 24.22.1
           cache: npm
           cache-dependency-path: tests/snippets/package-lock.json
       - run: npm ci
