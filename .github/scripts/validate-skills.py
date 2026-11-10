@@ -23,6 +23,7 @@ EXPECTED_SKILLS = {
     "convert-via-anchors",
     "create-fund-wallet",
     "discover-resolve-anchors",
+    "keeta-workspace",
     "multi-asset-balances",
     "pay-on-other-chains",
     "pay-out",

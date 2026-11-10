@@ -92,6 +92,7 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
 - Read balances with [multi-asset-balances](../multi-asset-balances/SKILL.md).
 - Send funds with [send-receive-tokens](../send-receive-tokens/SKILL.md).
 - Set limits before an agent moves value: [spend-policy](../spend-policy/SKILL.md).
+- Sign a person up for Keeta Workspace with this account: [keeta-workspace](../keeta-workspace/SKILL.md).
 - For the full map of what Keeta can do, start at the [keeta](../keeta/SKILL.md) skill.
 
 ## Sources

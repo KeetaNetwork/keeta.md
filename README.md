@@ -46,6 +46,7 @@ Other sites (keeta.com) link here with the same commands rather than copying the
 | [complete-kyb](plugins/keeta/skills/complete-kyb/SKILL.md) | Verify a business with Keeta's KYB provider (`entityType: 'business'`) |
 | [discover-resolve-anchors](plugins/keeta/skills/discover-resolve-anchors/SKILL.md) | Find and compare providers (asset movement, FX, KYC/KYB, usernames, storage, notifications) from on-chain metadata |
 | [spend-policy](plugins/keeta/skills/spend-policy/SKILL.md) | Network-enforced boundaries (vaults, delegation, multisig) plus advisory caps, approvals and audit |
+| [keeta-workspace](plugins/keeta/skills/keeta-workspace/SKILL.md) | Sign a person up for Keeta Workspace with the agent's own Keeta account, fund their organization with KUSD or USDC on Keeta, and hand projects and tasks to Workspace's agents |
 
 ## Accuracy policy
 
