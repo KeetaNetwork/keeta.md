@@ -14,6 +14,8 @@ Output layout (no website, only files agents read):
     .well-known/agent-skills/<name>.zip           multi-file skills, SKILL.md at the zip root
     .well-known/skills/index.json                 legacy discovery index (name/description/files)
     .well-known/skills/<name>/...                 every skill directory
+    version.json                                  the plugin version and the commit built, which
+                                                  Keeta Workspace checks to serve the newest skills
     _headers, _redirects, 404.html                Pages configuration and the not-found page, from site/
 
 `npx skills add https://keeta.md` reads the well-known indexes. Hosted copies are
@@ -28,7 +30,9 @@ import io
 import json
 import posixpath
 import re
+import os
 import shutil
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -67,6 +71,16 @@ def frontmatter(text: str) -> dict[str, str]:
 
 def digest(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def built_commit() -> str:
+    """The commit being built: Cloudflare Pages names it, and git does everywhere else."""
+    commit = os.environ.get("CF_PAGES_COMMIT_SHA") or subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    if not re.fullmatch(r"[0-9a-f]{40}", commit):
+        raise SystemExit(f"not a commit: {commit!r}")
+    return commit
 
 
 def skill_files(skill_dir: Path) -> list[str]:
@@ -202,6 +216,11 @@ def build(out: Path) -> None:
     )
     (out / LEGACY_WELL_KNOWN / "index.json").write_text(
         json.dumps({"skills": v1_entries}, indent=2) + "\n", encoding="utf-8"
+    )
+
+    plugin = json.loads((ROOT / "plugins" / "keeta" / ".claude-plugin" / "plugin.json").read_text("utf-8"))
+    (out / "version.json").write_text(
+        json.dumps({"version": plugin["version"], "commit": built_commit()}) + "\n", encoding="utf-8"
     )
 
     main_text = (SKILLS_ROOT / MAIN_SKILL / "SKILL.md").read_text(encoding="utf-8")
