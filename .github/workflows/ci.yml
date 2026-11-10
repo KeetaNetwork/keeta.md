@@ -28,6 +28,9 @@ jobs:
           test -s _site/skills/keeta/SKILL.md && test -s _site/skills/keeta/references/anchors.md
           test -s _site/.well-known/agent-skills/index.json && test -s _site/.well-known/skills/index.json
           test -s _site/_headers && test -s _site/_redirects
+          # /version.json names the plugin version and the commit built, which Keeta Workspace
+          # checks every hour to serve agents the newest skills.
+          python3 -c "import json,re,subprocess; v=json.load(open('_site/version.json')); p=json.load(open('plugins/keeta/.claude-plugin/plugin.json')); assert v=={'version':p['version'],'commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()}, v"
           if find _site -name '*.html' ! -name 404.html | grep -q .; then echo "keeta.md serves no HTML pages"; exit 1; fi
           grep -q 'https://keeta.md/skills/x402-payments/SKILL.md' _site/llms.txt
       - name: Check the Pages output directory matches the build

@@ -70,6 +70,7 @@ The build turns `plugins/keeta/skills/` and `site/` into `_site/`, the folder Cl
 | `/.well-known/agent-skills/index.json` | skill discovery index v0.2.0, used by `npx skills add https://keeta.md` |
 | `/.well-known/skills/index.json` | legacy discovery index, for older CLI versions |
 | `/.well-known/agent-skills/<name>/…` | every skill's files, plus a zip of each multi-file skill |
+| `/version.json` | the plugin version and the commit built, such as `{"version": "0.4.1", "commit": "a43c302…"}`; Keeta Workspace checks it every hour and serves the newest skills to every agent and Cub |
 
 - **Plain files.** Skills are served as `text/markdown; charset=utf-8`, the llms files as `text/plain; charset=utf-8` and the indexes as JSON, with no HTML around them.
 - **Any origin.** `site/_headers` lets any origin fetch every file, so browser-based agents can read them.
