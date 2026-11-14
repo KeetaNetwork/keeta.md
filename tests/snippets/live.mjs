@@ -42,17 +42,10 @@ const EXPECT = {
 	// facts.ts is not a skill block: it checks the fixed values the skills state, on both networks itself.
 	facts: { test: [/network facts match the skills/] }
 };
-// A run whose only failed pattern is listed here is skipped with a warning, not failed, when its output still shows
-// the `instead` pattern: quoting works and another provider answered, so the FX anchor is down (it prints either
-// "Could not get FX quote" or nothing at all), not the skill wrong. No plan at all, or any other failure, still fails.
-const PROVIDER_OUTAGE = {
-	'swap-quote on main': { pattern: /route: 'fx:/, instead: /route: 'assetMovement:/ }
-};
 const NETWORK_ENV = { main: { 'deposit-addresses': { KEETA_LIST_ONLY: 'yes' }, 'pay-on-other-chains': { KEETA_LIST_ONLY: 'yes' } } };
 
 const tests = [...readdirSync(new URL('./live/', import.meta.url)).filter((name) => name.endsWith('.ts')).sort().map((name) => `live/${name}`), 'facts.ts'];
 let failed = 0;
-let skipped = 0;
 let runs = 0;
 for (const file of tests) {
 	const name = file.replace(/^live\//, '').replace(/\.ts$/, '');
@@ -64,7 +57,6 @@ for (const file of tests) {
 		const expected = EXPECT[name]?.[network];
 		const label = `${name} on ${network}`;
 		let problems = [];
-		let outage = false;
 		// The routes come from live providers, so a failed run is retried once (same wallet) before it counts.
 		for (let attempt = 1; attempt <= 2; attempt++) {
 			const run = spawnSync('npx', ['tsx', file], {
@@ -82,15 +74,10 @@ for (const file of tests) {
 			console.log(`::group::${label}, attempt ${attempt} (${Math.round((Date.now() - started) / 1000)} s)`);
 			console.log(`${run.stdout ?? ''}${run.stderr ?? ''}`);
 			console.log('::endgroup::');
-			const known = PROVIDER_OUTAGE[label];
-			outage = Boolean(known) && problems.length === 1 && problems[0] === `output does not match ${known.pattern}` && known.instead.test(run.stdout ?? '');
 			if (!problems.length || !expected) break;
 			console.log(`attempt ${attempt} of ${label} failed: ${problems.join('; ')}`);
 		}
-		if (outage) {
-			skipped++;
-			console.log(`::warning::SKIP ${label}: the FX provider is down (only ${PROVIDER_OUTAGE[label].instead} plans came back), so ${problems[0]} was not enforced`);
-		} else if (problems.length) {
+		if (problems.length) {
 			failed++;
 			console.log(`FAIL ${label}: ${problems.join('; ')}`);
 		} else {
@@ -98,5 +85,5 @@ for (const file of tests) {
 		}
 	}
 }
-console.log(`${runs - failed - skipped} of ${runs} live runs passed${skipped ? `, ${skipped} skipped for a provider outage` : ''}.`);
+console.log(`${runs - failed} of ${runs} live runs passed.`);
 process.exit(failed ? 1 : 0);
