@@ -46,6 +46,7 @@ Other sites (keeta.com) link here with the same commands rather than copying the
 | [complete-kyb](plugins/keeta/skills/complete-kyb/SKILL.md) | Verify a business with Keeta's KYB provider (`entityType: 'business'`) |
 | [discover-resolve-anchors](plugins/keeta/skills/discover-resolve-anchors/SKILL.md) | Find and compare providers (asset movement, FX, KYC/KYB, usernames, storage, notifications) from on-chain metadata |
 | [spend-policy](plugins/keeta/skills/spend-policy/SKILL.md) | Network-enforced boundaries (vaults, delegation, multisig) plus advisory caps, approvals and audit |
+| [keeta-workspace](plugins/keeta/skills/keeta-workspace/SKILL.md) | Sign a person up for Keeta Workspace with the agent's own Keeta account, fund their organization with KUSD or USDC on Keeta, and hand projects and tasks to Workspace's agents |
 
 ## Accuracy policy
 
@@ -70,6 +71,7 @@ The build turns `plugins/keeta/skills/` and `site/` into `_site/`, the folder Cl
 | `/.well-known/agent-skills/index.json` | skill discovery index v0.2.0, used by `npx skills add https://keeta.md` |
 | `/.well-known/skills/index.json` | legacy discovery index, for older CLI versions |
 | `/.well-known/agent-skills/<name>/…` | every skill's files, plus a zip of each multi-file skill |
+| `/version.json` | the plugin version and the commit built, such as `{"version": "0.4.1", "commit": "a43c302…"}`; Keeta Workspace checks it every hour and serves the newest skills to every agent and Cub |
 
 - **Plain files.** Skills are served as `text/markdown; charset=utf-8`, the llms files as `text/plain; charset=utf-8` and the indexes as JSON, with no HTML around them.
 - **Any origin.** `site/_headers` lets any origin fetch every file, so browser-based agents can read them.
