@@ -48,7 +48,7 @@ Every Keeta wallet can get a free deposit address on Base from Keeta's own bridg
 
 ```bash
 npm init -y && npm pkg set type=module   # Node.js 24; see the keeta quickstart
-npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 tsx
+npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.108 tsx
 KEETA_SEED=… KEETA_NETWORK=main npx tsx deposit-address.mts          # production: an address on Base (8453)
 KEETA_SEED=… npx tsx deposit-address.mts                            # test network: an address on Base Sepolia (84532)
 # KEETA_FROM_CHAIN=chain:evm:42161 for Arbitrum; KEETA_LIST_ONLY=yes lists what can be deposited without creating an address

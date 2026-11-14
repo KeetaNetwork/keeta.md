@@ -117,7 +117,7 @@ The anchor SDK needs **Node.js 24** and ES modules. Set up a project once:
 ```bash
 node --version                                  # must print v24.x
 npm init -y && npm pkg set type=module          # top-level await needs ES modules
-npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.104 tsx
+npm install @keetanetwork/keetanet-client@0.18.8 @keetanetwork/anchor@0.0.108 tsx
 KEETA_SEED=… npx tsx quickstart.ts              # load the seed from your secret store; KEETA_NETWORK=main for production
 ```
 

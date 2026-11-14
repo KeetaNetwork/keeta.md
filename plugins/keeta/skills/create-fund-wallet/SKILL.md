@@ -14,7 +14,7 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
 
 ## SDK steps
 
-1. Install the client on Node.js 24 in an ES-module project: `npm init -y && npm pkg set type=module && npm install @keetanetwork/keetanet-client@0.18.8 tsx` (add `@keetanetwork/anchor@0.0.104` for anchors).
+1. Install the client on Node.js 24 in an ES-module project: `npm init -y && npm pkg set type=module && npm install @keetanetwork/keetanet-client@0.18.8 tsx` (add `@keetanetwork/anchor@0.0.108` for anchors).
 2. Create or restore the account, then connect:
 
    ```ts
