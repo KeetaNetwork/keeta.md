@@ -22,11 +22,10 @@ const EXPECT = {
 		test: [/0 transaction\(s\) for keeta_a/],
 		main: [/0 transaction\(s\) for keeta_a/]
 	},
-	// Quoting needs no balance. The plan count is checked loosely, and the route may start at an fx or an asset-movement provider,
-	// whichever answers; the log shows which providers answered.
+	// Quoting needs no balance. The plan count is checked loosely; the log shows which providers answered.
 	'swap-quote': {
 		test: [/\d+ plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on test/, /can convert into: /],
-		main: [/[1-9]\d* plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on main/, /route: '(fx|assetMovement):/, /can convert into: .*USDC keeta_a/]
+		main: [/[1-9]\d* plan\(s\) for 1 keeta_a\w+ -> keeta_a\w+ on main/, /route: 'fx:/, /can convert into: .*USDC keeta_a/]
 	},
 	// Test: Keeta's own Base bridge gives this wallet a Base Sepolia address. Main: Base routes are listed.
 	'deposit-addresses': {
