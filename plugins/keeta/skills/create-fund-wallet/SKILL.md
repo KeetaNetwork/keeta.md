@@ -14,7 +14,7 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
 
 ## SDK steps
 
-1. Install the client on Node.js 24 in an ES-module project: `npm init -y && npm pkg set type=module && npm install @keetanetwork/keetanet-client@0.18.8 tsx` (add `@keetanetwork/anchor@0.0.104` for anchors).
+1. Install the client on Node.js 24 in an ES-module project: `npm init -y && npm pkg set type=module && npm install @keetanetwork/keetanet-client@0.18.8 tsx` (add `@keetanetwork/anchor@0.0.108` for anchors).
 2. Create or restore the account, then connect:
 
    ```ts
@@ -92,6 +92,7 @@ Prefer a **dedicated account per agent**, funded with only what the task needs. 
 - Read balances with [multi-asset-balances](../multi-asset-balances/SKILL.md).
 - Send funds with [send-receive-tokens](../send-receive-tokens/SKILL.md).
 - Set limits before an agent moves value: [spend-policy](../spend-policy/SKILL.md).
+- Sign a person up for Keeta Workspace with this account: [keeta-workspace](../keeta-workspace/SKILL.md).
 - For the full map of what Keeta can do, start at the [keeta](../keeta/SKILL.md) skill.
 
 ## Sources

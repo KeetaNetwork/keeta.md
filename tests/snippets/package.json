@@ -10,7 +10,7 @@
     "trials": "node trials.mjs"
   },
   "dependencies": {
-    "@keetanetwork/anchor": "0.0.104",
+    "@keetanetwork/anchor": "0.0.108",
     "@keetanetwork/keetanet-client": "0.18.8",
     "@x402/core": "2.28.0",
     "@x402/express": "2.28.0",
